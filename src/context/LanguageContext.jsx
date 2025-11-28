@@ -39,11 +39,11 @@ const translations = {
       astral: {
         description: 'React Router implementation with modern component design',
       },
-      astrofy: {
+      controlia: {
         description: 'E-commerce application for astronomical equipment built with Next.js',
       },
       creatina: {
-        description: 'Specialized landing page for fitness supplements and creatine products',
+        description: 'Ecommerce for a dietary and fitness supplement brand',
       },
       dvt: {
         description: 'Catalog and sales platform for professional gastronomic equipment',
@@ -63,6 +63,8 @@ const translations = {
       viandashyg: {
         description: 'online store for a food business',
       },
+      rokotovich: {
+        description: 'Website for a law firm, soon to be launched.'},
       live: 'See project',
       code: 'Source Code',
     },
@@ -77,7 +79,7 @@ const translations = {
       send: 'Send Email',
     },
     footer: {
-      made: 'Made with',
+      made: 'Made',
       by: 'by',
       rights: 'All rights reserved.',
     },
@@ -110,11 +112,11 @@ const translations = {
       astral: {
         description: 'Sitio web para agencia de diseño web',
       },
-      astrofy: {
-        description: 'Aplicación de comercio electrónico construida con Next.js',
+      controlia: {
+        description: 'Sistema para gestion de comercios',
       },
       creatina: {
-        description: 'Landing page especializada para suplementos fitness y productos de creatina',
+        description: 'Eccomerce para marca de suplementos dietarios y fitness',
       },
       dvt: {
         description: 'Plataforma de catálogo y ventas para equipamiento gastronómico profesional',
@@ -134,6 +136,9 @@ const translations = {
       viandashyg: {
         description: 'Tienda online para empresa gastronomica de viandas',
       },
+      rokotovich: {
+        description: 'Sitio web para estudio juridico, proximo a lanzar.',
+      },
       live: 'Ver proyecto',
       code: 'Código Fuente',
     },
@@ -148,7 +153,7 @@ const translations = {
       send: 'Enviar Email',
     },
     footer: {
-      made: 'Hecho con',
+      made: 'Hecho',
       by: 'por',
       rights: 'Todos los derechos reservados.',
     },

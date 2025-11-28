@@ -29,12 +29,17 @@ const Navigation = () => {
 
   const handleNavClick = (e, href) => {
     e.preventDefault();
+  
     setIsOpen(false);
-    const element = document.querySelector(href);
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth' });
-    }
+  
+    setTimeout(() => {
+      const element = document.querySelector(href);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth' });
+      }
+    }, 350); 
   };
+  
 
   return (
     <nav
@@ -69,7 +74,7 @@ const Navigation = () => {
                 initial={{ opacity: 0, y: -20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.1 }}
-                className="text-gray-300 hover:text-yellow-400 transition-colors duration-300 relative group"
+                className="z-1000 text-gray-300 hover:text-yellow-400 transition-colors duration-300 relative group"
               >
                 {item.name}
                 <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-purple-400 to-yellow-400 group-hover:w-full transition-all duration-300"></span>

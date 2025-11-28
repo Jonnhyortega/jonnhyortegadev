@@ -35,21 +35,29 @@ const Contact = () => {
     },
   ];
 
-  const handleSocialClick = (e) => {
+  const handleSocialClick = (e, href) => {
+    e.preventDefault(); // Evita que se abra instantáneamente
+
     toast({
-      title: "⏳ Redirigiendo",
-      // description: `Enviando correo...`,
-      duration: 3000,
+      title: "⏳ Redirigiendo...",
+      duration: 1500
     });
+
+    setTimeout(() => {
+      // Si es mailto, no usar window.open con _blank (a veces bloquea)
+      if (href.startsWith("mailto:")) {
+        window.location.href = href;
+      } else {
+        window.open(href, "_blank");
+      }
+    }, 1200);
   };
 
   const container = {
     hidden: { opacity: 0 },
     show: {
       opacity: 1,
-      transition: {
-        staggerChildren: 0.1,
-      },
+      transition: { staggerChildren: 0.1 },
     },
   };
 
@@ -64,8 +72,10 @@ const Contact = () => {
         <title>{t('contact.title')} - Professional Portfolio</title>
         <meta name="description" content={t('contact.subtitle')} />
       </Helmet>
+
       <section id="contact" className="py-20 px-4 sm:px-6 lg:px-8">
         <div className="max-w-4xl mx-auto">
+
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -95,19 +105,22 @@ const Contact = () => {
                 key={link.name}
                 variants={item}
                 href={link.href}
-                target='_blank'
-                // onClick={(e) => handleSocialClick(e, link.name)}
+                onClick={(e) => handleSocialClick(e, link.href)}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 className="group relative bg-slate-900/50 backdrop-blur-sm rounded-xl p-8 border border-purple-500/20 hover:border-purple-500/50 transition-all duration-300 overflow-hidden"
               >
                 <div className={`absolute inset-0 bg-gradient-to-br ${link.color} opacity-0 group-hover:opacity-10 transition-opacity duration-300`}></div>
+
                 <div className="relative flex flex-col items-center gap-4">
                   <div className={`p-4 rounded-full bg-gradient-to-br ${link.color} shadow-lg`}>
-                    {link.name === "WhatsApp" ? 
-                    (<img width="40" height="40" src="https://img.icons8.com/color/48/whatsapp--v1.png" alt="whatsapp--v1"/>) : 
-                    (<link.icon className="w-8 h-8 text-white" />)}
+                    {link.name === "WhatsApp" ? (
+                      <img width="40" height="40" src="https://img.icons8.com/color/48/whatsapp--v1.png" alt="whatsapp" />
+                    ) : (
+                      <link.icon className="w-8 h-8 text-white" />
+                    )}
                   </div>
+
                   <span className="text-xl font-semibold text-white group-hover:text-yellow-400 transition-colors">
                     {link.name}
                   </span>

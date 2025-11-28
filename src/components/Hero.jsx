@@ -93,14 +93,11 @@ const Hero = () => {
               <button onClick={scrollToProjects} className="px-8 py-3 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white rounded-lg font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg shadow-purple-500/50">
                 {t('hero.cta')}
               </button>
-              <a href="#contact" onClick={e => {
-              e.preventDefault();
-              document.querySelector('#contact')?.scrollIntoView({
-                behavior: 'smooth'
-              });
-            }} className="px-8 py-3 bg-yellow-500 hover:bg-yellow-600 text-slate-950 rounded-lg font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg shadow-yellow-500/50">
+              <span onClick={e => {
+              window.open('https://api.whatsapp.com/send?phone=5491122684234&text=Hola%20quiero%20más%20info', '_blank');
+            }} className="cursor-pointer px-8 py-3 bg-yellow-500 hover:bg-yellow-600 text-slate-950 rounded-lg font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg shadow-yellow-500/50">
                 {t('hero.contact')}
-              </a>
+              </span>
             </motion.div>
           </div>
         </div>
