@@ -116,7 +116,7 @@ const Projects = () => {
       description: t('projects.chulos.description'),
       image: 'https://res.cloudinary.com/do87isqjr/image/upload/v1764194680/Logo-removebg-preview_1_qr35lb.png',
       tech: ['react', 'css3', 'js'],
-      liveUrl: 'https://www.chulosdesign.com',
+      liveUrl: 'https://landingchulos.vercel.app/',
       githubUrl: 'https://github.com/Jonnhyortega/landingchulos',
     },
     {
@@ -125,7 +125,7 @@ const Projects = () => {
       description: t('projects.sanitarios.description'),
       image: 'https://res.cloudinary.com/do87isqjr/image/upload/v1764196473/SanitariosLugano-removebg-preview_vms5em.png',
       tech: ['react', 'css3', 'js'],
-      liveUrl: 'https://sanitarioslugano.com',
+      liveUrl: 'https://sanitarioslugano.vercel.app',
       githubUrl: 'https://github.com/Jonnhyortega/sanitarioslugano',
     },
     // {

@@ -11,7 +11,21 @@ export const useLanguage = () => {
 };
 
 const translations = {
-  en: {
+    en: {
+    chatbot: {
+    header: "Jonathan Ortega’s Assistant Chatbot",
+    presentacion: "Hello! I’m Jonson AI, the smart assistant of Jonathan Ortega’s portfolio. How can I help you today?",
+    inputPlaceholder: "Type your message...",
+    sendButton: "Send",
+    loadingMessage: "Typing...",
+    openButton: "Open Chat",
+    quickReplies: {
+      budget: "How can I request a quote?",
+      social: "Social Media"
+    },
+    follow: "Follow me on",
+    and: "and"
+  },
     nav: {
       home: 'Home',
       projects: 'Projects',
@@ -65,7 +79,7 @@ const translations = {
       },
       rokotovich: {
         description: 'Website for a law firm, soon to be launched.'},
-      live: 'See project',
+      live: 'See demo',
       code: 'Source Code',
     },
     skills: {
@@ -85,6 +99,20 @@ const translations = {
     },
   },
   es: {
+      chatbot: {
+  header: "Chatbot Asistente de Jonathan Ortega",
+  presentacion: "¡Hola! Soy Jonson IA, el asistente inteligente del portafolio de Jonathan Ortega. ¿En qué puedo ayudarte hoy?",
+  inputPlaceholder: "Escribe tu mensaje aquí...",
+  sendButton: "Enviar",
+  loadingMessage: "escribiendo...",
+  openButton: "Abrir chat",
+  quickReplies: {
+    budget: "¿Cómo puedo pedir un presupuesto?",
+    social: "Redes sociales"
+  },
+  follow: "Sígueme en",
+  and: "y"
+    },
     nav: {
       home: 'Inicio',
       projects: 'Proyectos',
@@ -139,7 +167,7 @@ const translations = {
       rokotovich: {
         description: 'Sitio web para estudio juridico, proximo a lanzar.',
       },
-      live: 'Ver proyecto',
+      live: 'Ver demo',
       code: 'Código Fuente',
     },
     skills: {
