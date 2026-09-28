@@ -16,7 +16,8 @@ import {
 import { 
   SiMongodb, 
   SiTypescript, 
-  SiNextdotjs 
+  SiNextdotjs,
+  SiTailwindcss 
 } from 'react-icons/si';
 import { TiendaNubeIcon } from './ui/tnIcon';
 
@@ -33,12 +34,28 @@ const TechIcon = ({ type }) => {
     mongo: <SiMongodb className="text-[#47A248]" />,
     typescript: <SiTypescript className="text-[#3178C6]" />,
     next: <SiNextdotjs className="text-white" />,
+    tailwind: <SiTailwindcss className="text-[#06B6D4]" />,
     tn: <TiendaNubeIcon className="text-[#0068ff]" />
-    
+  };
+
+  const titles = {
+    react: 'React',
+    js: 'JavaScript',
+    html5: 'HTML5',
+    css3: 'CSS3',
+    node: 'Node.js',
+    python: 'Python',
+    aws: 'AWS',
+    docker: 'Docker',
+    mongo: 'MongoDB',
+    typescript: 'TypeScript',
+    next: 'Next.js',
+    tailwind: 'Tailwind CSS',
+    tn: 'Tienda Nube'
   };
 
   return (
-    <div className="w-6 h-6 flex items-center justify-center bg-slate-800 rounded p-1 hover:bg-slate-700 transition-colors" title={type}>
+    <div className="w-6 h-6 flex items-center justify-center bg-slate-800 rounded p-1 hover:bg-slate-700 transition-colors" title={titles[type] || type}>
       {icons[type] || null}
     </div>
   );
@@ -50,11 +67,11 @@ const Projects = () => {
   const projects = [
     {
       id: 1,
-      title: 'Personal Portfolio',
-      description: t('projects.portfolio.description'),
-      image: 'https://res.cloudinary.com/do87isqjr/image/upload/v1764197594/Captura_de_pantalla_2025-11-26_195144-removebg-preview_ewhpeo.png',
-      tech: ['react', 'html5', 'css3'],
-      liveUrl: 'https://jonnhyortegadev.com',
+      title: 'Ls Motos',
+      description: t('projects.lsmotos.description'),
+      image: 'https://res.cloudinary.com/do87isqjr/image/upload/v1790638270/combinado_motos_negro_qcrc2g.jpg',
+      tech: ['next', 'tailwind', 'css3'],
+      liveUrl: 'https://lsmotos.com',
       githubUrl: 'https://github.com/Jonnhyortega/JonathanOrtega-Proyects',
     },
     {
@@ -66,15 +83,15 @@ const Projects = () => {
       liveUrl: 'https://2j5uuy7hcg.execute-api.us-east-1.amazonaws.com',
       githubUrl: 'https://github.com/Jonnhyortega/ia-portfolio',
     },
-    // {
-    //   id: 3,
-    //   title: 'Controlia',
-    //   description: t('projects.controlia.description'),
-    //   image: 'https://res.cloudinary.com/do87isqjr/image/upload/v1764189600/logoAstral_losxg8.png',
-    //   tech: ['next', 'node', 'typescript', 'mongo'],
-    //   liveUrl: 'https://example.com',
-    //   githubUrl: 'https://github.com',
-    // },
+    {
+      id: 3,
+      title: 'Controlia',
+      description: t('projects.controlia.description'),
+      image: 'https://res.cloudinary.com/do87isqjr/image/upload/v1764769583/Captura_de_pantalla_2025-12-03_104451-removebg-preview_a13tvh.png',
+      tech: ['next', 'node', 'typescript', 'mongo'],
+      liveUrl: 'https://controlia-software.vercel.app/',
+      githubUrl: 'https://github.com/Jonnhyortega/controlia-software',
+    },
     {
       id: 4,
       title: 'Creatina Sticks',
@@ -84,23 +101,23 @@ const Projects = () => {
       liveUrl: 'https://creatinasticks.mitiendanube.com/',
       // githubUrl: 'https://github.com',
     },
-    {
-      id: 5,
-      title: 'DVT Equipamiento',
-      description: t('projects.dvt.description'),
-      image: 'https://res.cloudinary.com/do87isqjr/image/upload/v1764194841/dvt-logo_go5rsp.png',
-      tech: ['tn', 'css3'],
-      liveUrl: 'https://dvtequipamientogastronomi.mitiendanube.com',
-    },
-    {
-      id: 6,
-      title: 'Estudio juridico Rokotovich',
-      description: t('projects.rokotovich.description'),
-      image: 'https://res.cloudinary.com/do87isqjr/image/upload/v1764261488/logo-sinfondo_lbgdzo.png',
-      tech: ['next', 'js', 'css3'],
-      liveUrl: 'https://rokotovich.vercel.app/',
-      githubUrl: 'https://github.com/Jonnhyortega/rokotovich',
-    },
+    // {
+    //   id: 5,
+    //   title: 'DVT Equipamiento',
+    //   description: t('projects.dvt.description'),
+    //   image: 'https://res.cloudinary.com/do87isqjr/image/upload/v1764194841/dvt-logo_go5rsp.png',
+    //   tech: ['tn', 'css3'],
+    //   liveUrl: 'https://dvtequipamientogastronomi.mitiendanube.com',
+    // },
+    // {
+    //   id: 6,
+    //   title: 'Estudio juridico Rokotovich',
+    //   description: t('projects.rokotovich.description'),
+    //   image: 'https://res.cloudinary.com/do87isqjr/image/upload/v1764261488/logo-sinfondo_lbgdzo.png',
+    //   tech: ['next', 'js', 'css3'],
+    //   liveUrl: 'https://rokotovich.vercel.app/',
+    //   githubUrl: 'https://github.com/Jonnhyortega/rokotovich',
+    // },
     {
       id: 7,
       title: 'HC Habilitaciones',
@@ -128,15 +145,15 @@ const Projects = () => {
       liveUrl: 'https://sanitarioslugano.vercel.app',
       githubUrl: 'https://github.com/Jonnhyortega/sanitarioslugano',
     },
-    // {
-    //   id: 10,
-    //   title: 'Wuweiclip',
-    //   description: t('projects.wuwei.description'),
-    //   image: 'https://res.cloudinary.com/do87isqjr/image/upload/v1764194762/clipgenlogo-removebg-preview_yjla3s.png',
-    //   tech: ['react', 'node', 'python', 'aws'],
-    //   liveUrl: 'https://example.com',
-    //   githubUrl: 'https://github.com',
-    // },
+    {
+      id: 10,
+      title: 'Sublime Kids',
+      description: t('projects.wuwei.description'),
+      image: 'https://res.cloudinary.com/do87isqjr/image/upload/v1790637089/logo-color_v9mqkv.jpg',
+      tech: ['tn', 'css3'],
+      liveUrl: 'https://tiendadesublimekids26.mitiendanube.com/',
+      githubUrl: 'https://github.com',
+    },
     {
       id: 11,
       title: 'Casa Molinas',
@@ -146,15 +163,15 @@ const Projects = () => {
       liveUrl: 'https://casamolinas.mitiendanube.com/',
       // githubUrl: 'https://github.com',
     },
-    {
-      id: 12,
-      title: 'Viandas H&G',
-      description: t('projects.viandashyg.description'),
-      image: 'https://res.cloudinary.com/do87isqjr/image/upload/v1764201568/hyg-logo-removebg-preview_vjq36t.png',
-      tech: ['tn', 'css3'],
-      liveUrl: 'https://viandashyg.mitiendanube.com/',
-      // githubUrl: 'https://github.com',
-    },
+    // {
+    //   id: 12,
+    //   title: 'Viandas H&G',
+    //   description: t('projects.viandashyg.description'),
+    //   image: 'https://res.cloudinary.com/do87isqjr/image/upload/v1764201568/hyg-logo-removebg-preview_vjq36t.png',
+    //   tech: ['tn', 'css3'],
+    //   liveUrl: 'https://viandashyg.mitiendanube.com/',
+    //   // githubUrl: 'https://github.com',
+    // },
   ];
 
   const container = {

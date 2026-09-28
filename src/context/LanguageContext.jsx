@@ -41,8 +41,8 @@ const translations = {
     projects: {
       title: 'My Projects',
       subtitle: 'A showcase of my latest work and achievements',
-      portfolio: {
-        description: 'Interactive portfolio website built with React and modern web technologies',
+      lsmotos: {
+        description: 'Interactive website built with Next Js and modern web technologies',
       },
       chatbot: {
         description: 'AI-powered chatbot API deployed on AWS Lambda with serverless architecture',
@@ -54,7 +54,7 @@ const translations = {
         description: 'React Router implementation with modern component design',
       },
       controlia: {
-        description: 'E-commerce application for astronomical equipment built with Next.js',
+        description: 'Application for managing businesses',
       },
       creatina: {
         description: 'Ecommerce for a dietary and fitness supplement brand',
@@ -128,8 +128,8 @@ const translations = {
     projects: {
       title: 'Mis Proyectos',
       subtitle: 'Una muestra de mis últimos trabajos y logros',
-      portfolio: {
-        description: 'Sitio web de portafolio interactivo construido con React y tecnologías web modernas',
+      lsmotos: {
+        description: 'Sitio web interactivo construido con Next.js y tecnologías web modernas',
       },
       chatbot: {
         description: 'API de chatbot con IA desplegada en AWS Lambda con arquitectura serverless',
