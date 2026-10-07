@@ -1,9 +1,9 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Mail, Linkedin, Github, MessageSquare } from 'lucide-react';
+import { Mail, Linkedin, Github, MessageSquare, ArrowUpRight } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { toast } from '@/components/ui/use-toast';
-import { Helmet } from 'react-helmet';
+import SectionHeading from '@/components/fx/SectionHeading';
 
 const Contact = () => {
   const { t } = useLanguage();
@@ -53,82 +53,55 @@ const Contact = () => {
     }, 1200);
   };
 
-  const container = {
-    hidden: { opacity: 0 },
-    show: {
-      opacity: 1,
-      transition: { staggerChildren: 0.1 },
-    },
-  };
-
-  const item = {
-    hidden: { opacity: 0, y: 20 },
-    show: { opacity: 1, y: 0 },
-  };
-
   return (
     <>
-      <Helmet>
-        <title>{t('contact.title')} - Professional Portfolio</title>
-        <meta name="description" content={t('contact.subtitle')} />
-      </Helmet>
 
-      <section id="contact" className="py-20 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-4xl mx-auto">
+      <section id="contact" className="relative flex min-h-screen items-center px-4 py-32 sm:px-6 lg:px-8">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 bg-[radial-gradient(55%_50%_at_80%_45%,rgba(124,58,237,0.22),transparent_70%),radial-gradient(40%_40%_at_10%_90%,rgba(234,179,8,0.12),transparent_70%)]"
+        />
+        <div className="relative mx-auto w-full max-w-7xl">
+          <SectionHeading
+            index="04"
+            label="Contact"
+            title={t('contact.title')}
+            subtitle={t('contact.subtitle')}
+          />
 
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="text-center mb-16"
-          >
-            <h2 className="text-4xl md:text-5xl font-bold mb-4">
-              <span className="bg-gradient-to-r from-purple-400 to-yellow-400 bg-clip-text text-transparent">
-                {t('contact.title')}
-              </span>
-            </h2>
-            <div className="w-24 h-1 bg-gradient-to-r from-purple-400 to-yellow-400 mx-auto mb-4"></div>
-            <p className="text-gray-400 text-lg max-w-2xl mx-auto">
-              {t('contact.subtitle')}
-            </p>
-          </motion.div>
-
-          <motion.div
-            variants={container}
-            initial="hidden"
-            whileInView="show"
-            viewport={{ once: true }}
-            className="grid grid-cols-1 sm:grid-cols-2 gap-6"
-          >
-            {socialLinks.map((link) => (
+          <div className="max-w-2xl border-t border-white/10">
+            {socialLinks.map((link, i) => (
               <motion.a
                 key={link.name}
-                variants={item}
                 href={link.href}
                 onClick={(e) => handleSocialClick(e, link.href)}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="group relative bg-slate-900/50 backdrop-blur-sm rounded-xl p-8 border border-purple-500/20 hover:border-purple-500/50 transition-all duration-300 overflow-hidden"
+                initial={{ opacity: 0, x: -40 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true, margin: '-40px' }}
+                transition={{ delay: i * 0.1, duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+                className="group relative flex items-center gap-5 overflow-hidden border-b border-white/10 py-6"
               >
-                <div className={`absolute inset-0 bg-gradient-to-br ${link.color} opacity-0 group-hover:opacity-10 transition-opacity duration-300`}></div>
+                {/* Barrido de degradé al hacer hover */}
+                <span className={`absolute inset-0 -translate-x-full bg-gradient-to-r ${link.color} opacity-0 transition-all duration-500 group-hover:translate-x-0 group-hover:opacity-[0.14]`} />
 
-                <div className="relative flex flex-col items-center gap-4">
-                  <div className={`p-4 rounded-full bg-gradient-to-br ${link.color} shadow-lg`}>
-                    {link.name === "WhatsApp" ? (
-                      <img width="40" height="40" src="https://img.icons8.com/color/48/whatsapp--v1.png" alt="whatsapp" />
-                    ) : (
-                      <link.icon className="w-8 h-8 text-white" />
-                    )}
-                  </div>
+                <span className="relative font-mono text-xs text-yellow-400/80">0{i + 1}</span>
 
-                  <span className="text-xl font-semibold text-white group-hover:text-yellow-400 transition-colors">
-                    {link.name}
-                  </span>
+                <div className={`relative rounded-full bg-gradient-to-br ${link.color} p-3 shadow-lg transition-transform duration-500 group-hover:rotate-[360deg] group-hover:scale-110`}>
+                  {link.name === "WhatsApp" ? (
+                    <img width="28" height="28" src="https://img.icons8.com/color/48/whatsapp--v1.png" alt="whatsapp" />
+                  ) : (
+                    <link.icon className="h-7 w-7 text-white" />
+                  )}
                 </div>
+
+                <span className="relative flex-1 text-3xl font-bold tracking-tight text-white transition-all duration-300 group-hover:translate-x-2 group-hover:text-yellow-300 sm:text-4xl">
+                  {link.name}
+                </span>
+
+                <ArrowUpRight className="relative h-7 w-7 text-purple-300/60 transition-all duration-300 group-hover:-translate-y-1 group-hover:translate-x-1 group-hover:text-yellow-300" />
               </motion.a>
             ))}
-          </motion.div>
-
+          </div>
         </div>
       </section>
     </>

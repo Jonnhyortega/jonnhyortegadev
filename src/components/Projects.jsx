@@ -1,8 +1,10 @@
-import React from 'react';
-import { motion } from 'framer-motion';
+import React, { useRef } from 'react';
+import { motion, useScroll, useTransform, useMotionValue } from 'framer-motion';
 import { ExternalLink, Github } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
-import { Helmet } from 'react-helmet';
+import TiltCard from '@/components/fx/TiltCard';
+import SectionHeading from '@/components/fx/SectionHeading';
+import useMediaQuery from '@/hooks/useMediaQuery';
 import { 
   FaReact, 
   FaJs, 
@@ -55,7 +57,7 @@ const TechIcon = ({ type }) => {
   };
 
   return (
-    <div className="w-6 h-6 flex items-center justify-center bg-slate-800 rounded p-1 hover:bg-slate-700 transition-colors" title={titles[type] || type}>
+    <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/5 p-1.5 transition-all duration-300 hover:-translate-y-0.5 hover:border-purple-400/50 hover:bg-purple-500/10" title={titles[type] || type}>
       {icons[type] || null}
     </div>
   );
@@ -101,23 +103,23 @@ const Projects = () => {
       liveUrl: 'https://creatinasticks.mitiendanube.com/',
       // githubUrl: 'https://github.com',
     },
-    // {
-    //   id: 5,
-    //   title: 'DVT Equipamiento',
-    //   description: t('projects.dvt.description'),
-    //   image: 'https://res.cloudinary.com/do87isqjr/image/upload/v1764194841/dvt-logo_go5rsp.png',
-    //   tech: ['tn', 'css3'],
-    //   liveUrl: 'https://dvtequipamientogastronomi.mitiendanube.com',
-    // },
-    // {
-    //   id: 6,
-    //   title: 'Estudio juridico Rokotovich',
-    //   description: t('projects.rokotovich.description'),
-    //   image: 'https://res.cloudinary.com/do87isqjr/image/upload/v1764261488/logo-sinfondo_lbgdzo.png',
-    //   tech: ['next', 'js', 'css3'],
-    //   liveUrl: 'https://rokotovich.vercel.app/',
-    //   githubUrl: 'https://github.com/Jonnhyortega/rokotovich',
-    // },
+    {
+      id: 5,
+      title: 'DVT Equipamiento',
+      description: t('projects.dvt.description'),
+      image: 'https://res.cloudinary.com/do87isqjr/image/upload/v1764194841/dvt-logo_go5rsp.png',
+      tech: ['tn', 'css3'],
+      liveUrl: 'https://dvtequipamientogastronomi.mitiendanube.com',
+    },
+    {
+      id: 6,
+      title: 'Estudio juridico Rokotovich',
+      description: t('projects.rokotovich.description'),
+      image: 'https://res.cloudinary.com/do87isqjr/image/upload/v1764261488/logo-sinfondo_lbgdzo.png',
+      tech: ['next', 'js', 'css3'],
+      liveUrl: 'https://estudio-rokotovich.vercel.app/',
+      githubUrl: 'https://github.com/Jonnhyortega/rokotovich',
+    },
     {
       id: 7,
       title: 'HC Habilitaciones',
@@ -174,121 +176,127 @@ const Projects = () => {
     // },
   ];
 
-  const container = {
-    hidden: { opacity: 0 },
-    show: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.1,
-      },
-    },
-  };
+  const sectionRef = useRef(null);
+  const isDesktop = useMediaQuery('(min-width: 1024px)');
+  const { scrollYProgress } = useScroll({
+    target: sectionRef,
+    offset: ['start end', 'end start'],
+  });
+
+  // Parallax: cada columna se mueve a distinta velocidad (solo desktop)
+  const col0 = useTransform(scrollYProgress, [0, 1], [30, -30]);
+  const col1 = useTransform(scrollYProgress, [0, 1], [110, -110]);
+  const col2 = useTransform(scrollYProgress, [0, 1], [60, -60]);
+  const still = useMotionValue(0);
+  const columns = isDesktop ? [col0, col1, col2] : [still, still, still];
 
   const item = {
-    hidden: { opacity: 0, y: 20 },
-    show: { opacity: 1, y: 0 },
+    hidden: { opacity: 0, y: 70, rotateX: -16, scale: 0.95, transformPerspective: 1000 },
+    show: {
+      opacity: 1,
+      y: 0,
+      rotateX: 0,
+      scale: 1,
+      transformPerspective: 1000,
+      transition: { duration: 0.9, ease: [0.22, 1, 0.36, 1] },
+    },
   };
 
   return (
     <>
-      <Helmet>
-        <title>{t('projects.title')} - Professional Portfolio</title>
-        <meta name="description" content={t('projects.subtitle')} />
-      </Helmet>
-      <section id="projects" className="py-20 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="text-center mb-16"
-          >
-            <h2 className="text-4xl md:text-5xl font-bold mb-4">
-              <span className="bg-gradient-to-r from-purple-400 to-yellow-400 bg-clip-text text-transparent">
-                {t('projects.title')}
-              </span>
-            </h2>
-            <div className="w-24 h-1 bg-gradient-to-r from-purple-400 to-yellow-400 mx-auto mb-4"></div>
-            <p className="text-gray-400 text-lg max-w-2xl mx-auto">
-              {t('projects.subtitle')}
-            </p>
-          </motion.div>
+      <section id="projects" ref={sectionRef} className="relative px-4 pb-40 pt-28 sm:px-6 lg:px-8">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_bottom,transparent,rgba(7,3,15,0.55)_12%,rgba(7,3,15,0.55)_88%,transparent)]"
+        />
+        <div className="relative mx-auto max-w-7xl">
+          <SectionHeading
+            index="02"
+            label="Selected work"
+            title={t('projects.title')}
+            subtitle={t('projects.subtitle')}
+          />
 
-          <motion.div
-            variants={container}
-            initial="hidden"
-            whileInView="show"
-            viewport={{ once: true }}
-            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
-          >
-            {projects.map((project) => (
-              <motion.div
-                key={project.id}
-                variants={item}
-                className={`group relative bg-slate-900/50 backdrop-blur-sm rounded-xl overflow-hidden border border-purple-500/20 hover:border-purple-500/50 transition-all duration-300 flex flex-col`}
-              >
-                <div className={`
-                  ${project.title === "API Chatbot" ||  
-                  project.title === "Astral Vision" ||  
-                  project.title === "Chulos Design" ? "bg-gray-300" : 
-                  project.title === "Creatina Sticks" ? "bg-[#68A305]" : 
-                  project.title === "Casa Molinas" ? "bg-[#F8F4EF]" : 
-                  project.title === "HC Habilitaciones" ? "bg-[#1550A0]" : 
-                  project.title === "Wuweiclip" ? "bg-black" : 
-                  ""} relative h-48 overflow-hidden shrink-0 flex justify-center items-center`}>
-                  <img
-                    src={project.image}
-                    alt={project.title}
-                    className={`${
-                      project.title === "Personal Portfolio" || 
-                      project.title === "Wuweiclip" || 
-                      project.title === "Chulos Design" || 
-                      project.title === "Sanitarios Lugano" ? "w-[120px] h-[120px]" : 
-                      project.title === "DVT Equipamiento" ? "w-[80%] h-[160px]" :
-                      "w-full h-full"
-                    }  object-cover transform group-hover:scale-110 transition-transform duration-500`}
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/50 to-transparent opacity-60"></div>
-                </div>
+          <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
+            {projects.map((project, index) => (
+              <motion.div key={project.id} style={{ y: columns[index % 3] }}>
+                <motion.div
+                  variants={item}
+                  initial="hidden"
+                  whileInView="show"
+                  viewport={{ once: true, margin: '-60px' }}
+                  transition={{ delay: (index % 3) * 0.08 }}
+                  className="h-full"
+                >
+                  <TiltCard className="h-full" innerClassName="flex h-full flex-col">
+                    <div className={`
+                      ${project.title === "API Chatbot" ||  
+                      project.title === "Astral Vision" ||  
+                      project.title === "Chulos Design" ? "bg-gray-300" : 
+                      project.title === "Creatina Sticks" ? "bg-[#68A305]" : 
+                      project.title === "Casa Molinas" ? "bg-[#F8F4EF]" : 
+                      project.title === "HC Habilitaciones" ? "bg-[#1550A0]" : 
+                      project.title === "Wuweiclip" ? "bg-black" : 
+                      ""} relative h-52 overflow-hidden shrink-0 flex justify-center items-center`}>
+                      <img
+                        src={project.image}
+                        alt={project.title}
+                        loading="lazy"
+                        className={`${
+                          project.title === "Personal Portfolio" || 
+                          project.title === "Wuweiclip" || 
+                          project.title === "Chulos Design" || 
+                          project.title === "Sanitarios Lugano" ? "w-[120px] h-[120px]" : 
+                          project.title === "DVT Equipamiento" ? "w-[80%] h-[160px]" :
+                          "w-full h-full"
+                        }  object-cover transform group-hover:scale-110 transition-transform duration-700`}
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-ink via-ink/40 to-transparent opacity-70"></div>
+                      <span className="absolute left-4 top-4 rounded-md border border-white/10 bg-ink/70 px-2 py-1 font-mono text-[11px] tracking-widest text-yellow-300 backdrop-blur-md">
+                        {String(index + 1).padStart(2, '0')}
+                      </span>
+                    </div>
 
-                <div className="p-6 flex flex-col grow">
-                  <h3 className="text-xl font-bold text-white mb-2 group-hover:text-yellow-400 transition-colors">
-                    {project.title}
-                  </h3>
-                  <p className="text-gray-400 mb-4 text-sm leading-relaxed grow">
-                    {project.description}
-                  </p>
+                    <div className="flex grow flex-col p-6">
+                      <h3 className="mb-2 text-2xl font-bold tracking-tight text-white transition-colors group-hover:text-gradient">
+                        {project.title}
+                      </h3>
+                      <p className="mb-5 grow text-sm leading-relaxed text-purple-100/60">
+                        {project.description}
+                      </p>
 
-                  <div className="flex flex-wrap gap-2 mb-6">
-                    {project.tech.map((techType, index) => (
-                      <TechIcon key={index} type={techType} />
-                    ))}
-                  </div>
+                      <div className="mb-6 flex flex-wrap gap-2">
+                        {project.tech.map((techType, i) => (
+                          <TechIcon key={i} type={techType} />
+                        ))}
+                      </div>
 
-                  <div className="flex gap-3 mt-auto">
-                    <a
-                      href={project.liveUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-2 px-4 py-2 bg-purple-600/20 hover:bg-purple-600/30 border border-purple-400/30 rounded-lg transition-all duration-300 text-purple-300 hover:text-yellow-400 text-sm"
-                    >
-                      <ExternalLink className="w-4 h-4" />
-                      {t('projects.live')}
-                    </a>
-                    {project.githubUrl ? (<a
-                      href={project.githubUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-2 px-4 py-2 bg-slate-800/50 hover:bg-slate-800 border border-slate-600/30 rounded-lg transition-all duration-300 text-gray-300 hover:text-white text-sm"
-                    >
-                      <Github className="w-4 h-4" />
-                      {t('projects.code')}
-                    </a>) : ""}
-                  </div>
-                </div>
+                      <div className="mt-auto flex gap-3">
+                        <a
+                          href={project.liveUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2 rounded-full border border-purple-400/30 bg-purple-600/20 px-4 py-2 text-sm text-purple-200 transition-all duration-300 hover:border-yellow-400/60 hover:bg-yellow-400/10 hover:text-yellow-300"
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                          {t('projects.live')}
+                        </a>
+                        {project.githubUrl ? (<a
+                          href={project.githubUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-gray-300 transition-all duration-300 hover:border-white/30 hover:text-white"
+                        >
+                          <Github className="h-4 w-4" />
+                          {t('projects.code')}
+                        </a>) : ""}
+                      </div>
+                    </div>
+                  </TiltCard>
+                </motion.div>
               </motion.div>
             ))}
-          </motion.div>
+          </div>
         </div>
       </section>
     </>

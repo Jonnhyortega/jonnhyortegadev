@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { Toaster } from '@/components/ui/toaster';
 import Navigation from '@/components/Navigation';
 import Hero from '@/components/Hero';
@@ -6,8 +6,13 @@ import Projects from '@/components/Projects';
 import Skills from '@/components/Skills';
 import Contact from '@/components/Contact';
 import Footer from '@/components/Footer';
-import LanguageProvider from '@/context/LanguageContext';
+import SideHud from '@/components/SideHud';
+import ScrollMarquee from '@/components/fx/ScrollMarquee';
+import LanguageProvider, { useLanguage } from '@/context/LanguageContext';
 import Chatbot from './components/Chatbot';
+
+// Three.js se carga aparte para no bloquear el primer render
+const Scene = lazy(() => import('@/components/three/Scene'));
 
 const context = `
 ## Sos Jonson IA asistente del portafolios de Jonathan Ortega
@@ -57,20 +62,43 @@ Jonathan Ortega es Desarrollador Full-Stack especializado en MERN (MongoDB, Expr
 
 
 function App() {
+  const { t } = useLanguage();
   return (
-    <LanguageProvider>
-      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 to-slate-900">
-        <Navigation />
-        <Chatbot context={context} />
+    <div className="grain relative min-h-screen overflow-x-clip bg-ink">
+      {/* Capa base: degradé profundo violeta -> negro */}
+      <div
+        aria-hidden
+        className="pointer-events-none fixed inset-0 z-0 bg-[radial-gradient(70%_60%_at_70%_0%,#1a0b3d_0%,transparent_70%),radial-gradient(60%_50%_at_0%_100%,#1b1204_0%,transparent_70%)]"
+      />
+      <Suspense fallback={null}>
+        <Scene />
+      </Suspense>
+
+      <Navigation />
+      <SideHud />
+      <Chatbot context={context} />
+      <main className="relative z-10">
         <Hero />
+        <ScrollMarquee text={t('hero.title')} />
         <Projects />
         <Skills />
         <Contact />
+      </main>
+      <div className="relative z-10">
         <Footer />
-        <Toaster />
       </div>
+      <Toaster />
+    </div>
+  );
+}
+
+// El idioma vive en el contexto, por eso el Provider envuelve a la app interna.
+function Root() {
+  return (
+    <LanguageProvider>
+      <App />
     </LanguageProvider>
   );
 }
 
-export default App;
+export default Root;

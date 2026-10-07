@@ -13,65 +13,59 @@ const Footer = () => {
   ];
 
   return (
-    <footer
-      className="
-        bg-gradient-to-b from-slate-950/40 to-slate-950/80
-        backdrop-blur-md border-t border-purple-500/20
-        pt-10 pb-6
-      "
-    >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <footer className="relative overflow-hidden border-t border-white/5 bg-gradient-to-b from-transparent via-ink/80 to-ink pt-12 backdrop-blur-[2px]">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
 
-        {/* Top Section */}
-        <div className="flex flex-col items-center gap-6">
+        <div className="flex flex-col items-start justify-between gap-8 md:flex-row md:items-center">
 
           {/* Branding */}
-          <div className="flex items-center gap-2 text-gray-300 text-sm">
+          <div className="flex items-center gap-2 text-sm text-purple-100/70">
             <span>{t('footer.made')}</span>
             <span>{t('footer.by')}</span>
 
-            <span className="text-yellow-400 font-semibold tracking-wide">
+            <span className="font-semibold tracking-wide text-yellow-400">
               Jonnhy Ortega
             </span>
-            <Heart className="w-4 h-4 text-red-500 fill-red-500 animate-pulse" />
+            <Heart className="h-4 w-4 animate-pulse fill-red-500 text-red-500" />
+          </div>
+
+          {/* Navigation */}
+          <div className="flex flex-wrap gap-6 font-mono text-xs uppercase tracking-widest text-purple-200/60">
+            <a href="#home" className="transition-colors hover:text-yellow-400"> {t('nav.home')} </a>
+            <a href="#projects" className="transition-colors hover:text-yellow-400"> {t('nav.projects')} </a>
+            <a href="#skills" className="transition-colors hover:text-yellow-400"> {t('nav.skills')} </a>
+            <a href="#contact" className="transition-colors hover:text-yellow-400"> {t('nav.contact')} </a>
           </div>
 
           {/* Socials */}
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-3">
             {socials.map((s) => (
               <a
                 key={s.label}
                 href={s.href}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="
-                  group flex items-center justify-center w-10 h-10
-                  rounded-full border border-purple-500/20
-                  hover:border-purple-500/40
-                  bg-slate-900/40 backdrop-blur-sm
-                  transition-all duration-300 hover:scale-105
-                "
+                aria-label={s.label}
+                className="group flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/5 transition-all duration-300 hover:-translate-y-1 hover:border-yellow-400/50 hover:shadow-[0_0_20px_-4px_rgba(250,204,21,0.6)]"
               >
-                <s.icon className="w-5 h-5 text-gray-300 group-hover:text-yellow-400 transition-colors" />
+                <s.icon className="h-5 w-5 text-purple-100/70 transition-colors group-hover:text-yellow-400" />
               </a>
             ))}
           </div>
 
-          {/* Navigation */}
-          <div className="flex flex-wrap justify-center gap-6 text-sm text-gray-400">
-            <a href="#home" className="hover:text-yellow-400 transition-colors"> {t('nav.home')} </a>
-            <a href="#projects" className="hover:text-yellow-400 transition-colors"> {t('nav.projects')} </a>
-            <a href="#skills" className="hover:text-yellow-400 transition-colors"> {t('nav.skills')} </a>
-            <a href="#contact" className="hover:text-yellow-400 transition-colors"> {t('nav.contact')} </a>
-          </div>
-
         </div>
 
-        {/* Divider */}
-        <div className="mt-8 mb-4 border-t border-purple-500/10"></div>
+        {/* Wordmark gigante */}
+        <p
+          aria-hidden
+          className="select-none whitespace-nowrap pt-10 text-center font-display text-[clamp(2.4rem,11vw,11rem)] font-bold uppercase leading-[0.85] tracking-tighter text-outline"
+          style={{ WebkitTextStroke: '1px rgba(196,181,253,0.22)' }}
+        >
+          Jonnhy Ortega
+        </p>
 
         {/* Bottom */}
-        <p className="text-center text-gray-500 text-xs">
+        <p className="relative -mt-2 pb-6 text-center font-mono text-[11px] tracking-widest text-purple-200/40">
           © {year} {t('footer.rights')}
         </p>
 

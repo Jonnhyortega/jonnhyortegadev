@@ -81,7 +81,7 @@ useEffect(() => {
               target="_blank"
               rel="noopener noreferrer"
             >  
-              <img width="24" src="https://img.icons8.com/fluency/48/whatsapp.png" />
+              <img width="24" height="24" src="https://img.icons8.com/fluency/48/whatsapp.png" alt="WhatsApp" />
               +541122684234
             </a>
           </span>
@@ -98,12 +98,12 @@ useEffect(() => {
           <span className="flex items-center gap-2">
             {t("Sígueme en")}{" "}
             <a className="flex items-center gap-2 text-white underline" href="https://instagram.com/jonnhyortega" target="_blank">
-              <img width="24" src="https://img.icons8.com/color/48/instagram.png" />
+              <img width="24" height="24" src="https://img.icons8.com/color/48/instagram.png" alt="Instagram" />
               Instagram
             </a>{" "}
             {t("y")}{" "}
             <a className="flex items-center gap-2 text-white underline" href="https://linkedin.com/in/jonathan-ortega-a00970191" target="_blank">
-              <img width="24" src="https://img.icons8.com/fluency/48/linkedin.png" />
+              <img width="24" height="24" src="https://img.icons8.com/fluency/48/linkedin.png" alt="LinkedIn" />
               LinkedIn
             </a>
           </span>
@@ -156,15 +156,16 @@ useEffect(() => {
         {!chatOpen ? (
         <button
             onClick={toggleChat}
-            className="group flex items-center gap-2 px-4 py-3 rounded-2xl 
-            bg-white/10 backdrop-blur-md border border-white/20 shadow-lg
-            hover:bg-white/20 transition-all text-white font-light 
-            hover:shadow-purple-500/30"
+            className="group flex items-center gap-2 px-5 py-3 rounded-full
+            bg-brand-gradient border border-white/20 shadow-[0_0_40px_-6px_rgba(168,85,247,0.9)]
+            hover:scale-105 hover:shadow-[0_0_50px_-4px_rgba(250,204,21,0.7)] transition-all text-white font-medium"
         >
             <img
             width="22"
             src="https://img.icons8.com/ios-filled/50/chat.png"
-            className="opacity-80 group-hover:opacity-100 transition"
+            alt=""
+            aria-hidden="true"
+            className="opacity-90 group-hover:opacity-100 transition invert"
             />
             <span className="font-[var(--kanit)]">
             {t("chatbot.openButton")}
