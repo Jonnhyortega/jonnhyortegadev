@@ -95,23 +95,6 @@ const Projects = () => {
       githubUrl: 'https://github.com/Jonnhyortega/controlia-software',
     },
     {
-      id: 4,
-      title: 'Creatina Sticks',
-      description: t('projects.creatina.description'),
-      image: 'https://res.cloudinary.com/do87isqjr/image/upload/v1764194811/CSlogo-removebg-preview_fydzhj.png',
-      tech: ['tn', 'css3'],
-      liveUrl: 'https://creatinasticks.mitiendanube.com/',
-      // githubUrl: 'https://github.com',
-    },
-    {
-      id: 5,
-      title: 'DVT Equipamiento',
-      description: t('projects.dvt.description'),
-      image: 'https://res.cloudinary.com/do87isqjr/image/upload/v1764194841/dvt-logo_go5rsp.png',
-      tech: ['tn', 'css3'],
-      liveUrl: 'https://dvtequipamientogastronomi.mitiendanube.com',
-    },
-    {
       id: 6,
       title: 'Estudio juridico Rokotovich',
       description: t('projects.rokotovich.description'),
@@ -233,7 +216,6 @@ const Projects = () => {
                       ${project.title === "API Chatbot" ||  
                       project.title === "Astral Vision" ||  
                       project.title === "Chulos Design" ? "bg-gray-300" : 
-                      project.title === "Creatina Sticks" ? "bg-[#68A305]" : 
                       project.title === "Casa Molinas" ? "bg-[#F8F4EF]" : 
                       project.title === "HC Habilitaciones" ? "bg-[#1550A0]" : 
                       project.title === "Wuweiclip" ? "bg-black" : 
@@ -247,7 +229,6 @@ const Projects = () => {
                           project.title === "Wuweiclip" || 
                           project.title === "Chulos Design" || 
                           project.title === "Sanitarios Lugano" ? "w-[120px] h-[120px]" : 
-                          project.title === "DVT Equipamiento" ? "w-[80%] h-[160px]" :
                           "w-full h-full"
                         }  object-cover transform group-hover:scale-110 transition-transform duration-700`}
                       />

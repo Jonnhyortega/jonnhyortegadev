@@ -56,12 +56,6 @@ const translations = {
       controlia: {
         description: 'Application for managing businesses',
       },
-      creatina: {
-        description: 'Ecommerce for a dietary and fitness supplement brand',
-      },
-      dvt: {
-        description: 'Catalog and sales platform for professional gastronomic equipment',
-      },
       chulos: {
         description: 'Responsive landing page with modern design principles',
       },
@@ -142,12 +136,6 @@ const translations = {
       },
       controlia: {
         description: 'Sistema para gestion de comercios',
-      },
-      creatina: {
-        description: 'Eccomerce para marca de suplementos dietarios y fitness',
-      },
-      dvt: {
-        description: 'Plataforma de catálogo y ventas para equipamiento gastronómico profesional',
       },
       chulos: {
         description: 'Página de aterrizaje responsiva con principios de diseño moderno para empresa de muebles',
