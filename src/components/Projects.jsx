@@ -100,7 +100,7 @@ const Projects = () => {
       description: t('projects.rokotovich.description'),
       image: 'https://res.cloudinary.com/do87isqjr/image/upload/v1764261488/logo-sinfondo_lbgdzo.png',
       tech: ['next', 'js', 'css3'],
-      liveUrl: 'https://estudio-rokotovich.vercel.app/',
+      liveUrl: 'https://www.estudiorokotovich.com/',
       githubUrl: 'https://github.com/Jonnhyortega/rokotovich',
     },
     {
