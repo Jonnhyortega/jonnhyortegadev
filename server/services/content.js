@@ -3,13 +3,22 @@ import { z } from 'zod';
 import { and, asc, desc, eq, inArray, notInArray, sql } from 'drizzle-orm';
 import { contentRevisions, projects, theme, translations } from '../db/schema.js';
 import { HttpError, NotFoundError, VersionConflictError } from '../lib/errors.js';
+import { recordAudit } from './audit.js';
 import { themeToCssVars } from '../../src/content/theme.js';
 import { projectInputSchema } from '../schemas/projects.js';
 import { themeSchema } from '../schemas/theme.js';
 import { translationsSchema } from '../schemas/translations.js';
 
 const MAX_REVISIONS = 30;
+const MAX_PROJECTS = 50;
 const SINGLETONS = { translations, theme };
+
+// Auditoría en la MISMA transacción que la escritura: si falla, se revierte todo.
+// `audit` = { event, ipHash, userAgent, meta }; `extra` completa la meta.
+async function auditIn(tx, audit, now, extra = {}) {
+  if (!audit) return;
+  await recordAudit(tx, { ...audit, meta: { ...audit.meta, ...extra }, now });
+}
 
 const toPublicProject = (row) => ({
   id: row.id,
@@ -102,7 +111,7 @@ async function addRevision(tx, entity, data, now) {
   }
 }
 
-async function writeSingleton(db, entity, { data, version, now }) {
+async function writeSingleton(db, entity, { data, version, now, audit }) {
   const table = SINGLETONS[entity];
   return db.transaction(async (tx) => {
     const rows = await tx
@@ -112,6 +121,7 @@ async function writeSingleton(db, entity, { data, version, now }) {
       .returning({ version: table.version });
     if (rows.length === 0) throw new VersionConflictError();
     await addRevision(tx, entity, data, now);
+    await auditIn(tx, audit, now);
     return { data, version: rows[0].version };
   });
 }
@@ -131,22 +141,27 @@ function slugFor(title) {
   return `${base}-${randomUUID().slice(0, 8)}`;
 }
 
-export async function createProject(db, { data, now }) {
+export async function createProject(db, { data, now, audit }) {
   const slug = slugFor(data.title);
   return db.transaction(async (tx) => {
-    const [{ next }] = await tx
-      .select({ next: sql`coalesce(max(${projects.position}), -1) + 1`.mapWith(Number) })
+    const [{ next, total }] = await tx
+      .select({
+        next: sql`coalesce(max(${projects.position}), -1) + 1`.mapWith(Number),
+        total: sql`count(*)`.mapWith(Number),
+      })
       .from(projects);
+    if (total >= MAX_PROJECTS) throw new HttpError(400, 'limit_reached');
     const [row] = await tx
       .insert(projects)
       .values({ ...data, slug, position: next, createdAt: now, updatedAt: now })
       .returning();
     await addRevision(tx, 'projects', await projectsSnapshot(tx), now);
+    await auditIn(tx, audit, now, { projectId: row.id });
     return toAdminProject(row);
   });
 }
 
-export async function updateProject(db, id, { data, version, now }) {
+export async function updateProject(db, id, { data, version, now, audit }) {
   return db.transaction(async (tx) => {
     const rows = await tx
       .update(projects)
@@ -161,11 +176,12 @@ export async function updateProject(db, id, { data, version, now }) {
       throw exists ? new VersionConflictError() : new NotFoundError();
     }
     await addRevision(tx, 'projects', await projectsSnapshot(tx), now);
+    await auditIn(tx, audit, now, { projectId: id });
     return toAdminProject(rows[0]);
   });
 }
 
-export async function deleteProject(db, id, { now = new Date() } = {}) {
+export async function deleteProject(db, id, { now = new Date(), audit } = {}) {
   return db.transaction(async (tx) => {
     const rows = await tx
       .delete(projects)
@@ -173,11 +189,12 @@ export async function deleteProject(db, id, { now = new Date() } = {}) {
       .returning({ id: projects.id });
     if (rows.length === 0) throw new NotFoundError();
     await addRevision(tx, 'projects', await projectsSnapshot(tx), now);
+    await auditIn(tx, audit, now, { projectId: id });
   });
 }
 
 // `ids` debe contener exactamente todos los proyectos, en el nuevo orden.
-export async function reorderProjects(db, ids, { now = new Date() } = {}) {
+export async function reorderProjects(db, ids, { now = new Date(), audit } = {}) {
   return db.transaction(async (tx) => {
     const current = await tx.select({ id: projects.id }).from(projects);
     const same =
@@ -192,6 +209,7 @@ export async function reorderProjects(db, ids, { now = new Date() } = {}) {
         .where(eq(projects.id, id));
     }
     await addRevision(tx, 'projects', await projectsSnapshot(tx), now);
+    await auditIn(tx, audit, now);
     return (await orderedProjects(tx)).map(toAdminProject);
   });
 }
@@ -208,7 +226,8 @@ export async function listRevisions(db, entity) {
     })
     .from(contentRevisions)
     .where(eq(contentRevisions.entity, entity))
-    .orderBy(desc(contentRevisions.seq));
+    .orderBy(desc(contentRevisions.seq))
+    .limit(MAX_REVISIONS);
 }
 
 const SNAPSHOT_META = z
@@ -258,7 +277,7 @@ const SINGLETON_SCHEMAS = { translations: translationsSchema, theme: themeSchema
 // Restaura una revisión como una escritura nueva: incrementa versión y deja
 // su propia revisión. La foto se revalida con el esquema vigente; si ya no
 // es compatible, no se escribe nada (409 revision_incompatible).
-export async function restoreRevision(db, { id, now }) {
+export async function restoreRevision(db, { id, now, audit }) {
   return db.transaction(async (tx) => {
     const [revision] = await tx.select().from(contentRevisions).where(eq(contentRevisions.id, id));
     if (!revision) throw new NotFoundError();
@@ -282,6 +301,7 @@ export async function restoreRevision(db, { id, now }) {
         }
       }
       await addRevision(tx, 'projects', await projectsSnapshot(tx), now);
+      await auditIn(tx, audit, now, { entity: 'projects' });
       return { entity: 'projects', data: (await orderedProjects(tx)).map(toAdminProject) };
     }
 
@@ -296,6 +316,7 @@ export async function restoreRevision(db, { id, now }) {
       .returning({ version: table.version });
     if (rows.length === 0) throw new NotFoundError();
     await addRevision(tx, revision.entity, parsed.data, now);
+    await auditIn(tx, audit, now, { entity: revision.entity });
     return { entity: revision.entity, data: parsed.data, version: rows[0].version };
   });
 }

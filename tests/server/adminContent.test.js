@@ -1,12 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import request from 'supertest';
-import { count, eq } from 'drizzle-orm';
+import { count, eq, sql } from 'drizzle-orm';
 import { buildTestApp } from './helpers/app.js';
 import { loginAs } from './helpers/auth.js';
 import { seedContent } from '../../server/db/seed.js';
 import { auditLog, contentRevisions, projects } from '../../server/db/schema.js';
-import { DEFAULT_TRANSLATIONS, DEFAULT_THEME } from '../../src/content/defaults.js';
+import { DEFAULT_PROJECTS, DEFAULT_TRANSLATIONS, DEFAULT_THEME } from '../../src/content/defaults.js';
 
+const DEFAULT_PROJECTS_COUNT = DEFAULT_PROJECTS.length;
 const ORIGIN = 'https://example.test';
 
 async function setup() {
@@ -381,5 +382,71 @@ describe('admin revisions', () => {
     const rec = await loginAs(ctx, 'recovery');
     const res = await ctx.call('get', '/api/admin/revisions/theme', undefined, { csrf: rec.csrf, cookie: rec.cookie });
     expect(res.status).toBe(404);
+  });
+});
+
+describe('endurecimiento (ronda 1)', () => {
+  it('fields tiene tope de 20 entradas y segmentos de 64 caracteres', async () => {
+    const { call } = await setup();
+    const data = clone(DEFAULT_TRANSLATIONS);
+    for (let i = 0; i < 300; i++) data.en[`${i}-${'k'.repeat(150)}`] = 'x';
+    const res = await call('put', '/api/admin/translations', { data, version: 0 });
+    expect(res.status).toBe(400);
+    expect(res.body.fields.length).toBeLessThanOrEqual(20);
+    for (const path of res.body.fields) {
+      for (const segment of path.split('.')) expect(segment.length).toBeLessThanOrEqual(64);
+    }
+  });
+
+  it('PUT /projects/<no uuid> con cuerpo inválido: 404 antes que 400', async () => {
+    const { call } = await setup();
+    const res = await call('put', '/api/admin/projects/no-es-uuid', { basura: true });
+    expect(res.status).toBe(404);
+    expect(res.body).toEqual({ error: 'not_found' });
+  });
+
+  it('auditoría de update y reorder incluye entity y action', async () => {
+    const { call, db } = await setup();
+    const ids = await projectIds(call);
+    await call('put', `/api/admin/projects/${ids[0]}`, { data: validProject(), version: 0 });
+    await call('put', '/api/admin/projects/order', { ids: [...ids].reverse() });
+    const rows = await db.select().from(auditLog).where(eq(auditLog.event, 'content_updated'));
+    expect(rows.map((r) => r.meta)).toEqual([
+      { entity: 'projects', action: 'update', projectId: ids[0] },
+      { entity: 'projects', action: 'reorder' },
+    ]);
+  });
+
+  it('si falla la auditoría, la escritura se revierte (500 y versión intacta)', async () => {
+    const { call, db } = await setup();
+    await db.execute(sql`ALTER TABLE audit_log ADD CONSTRAINT audit_siempre_falla CHECK (false) NOT VALID`);
+    const data = clone(DEFAULT_TRANSLATIONS);
+    data.en.hero.title = 'No debe persistir';
+    const res = await call('put', '/api/admin/translations', { data, version: 0 });
+    expect(res.status).toBe(500);
+    const get = await call('get', '/api/admin/translations');
+    expect(get.body.version).toBe(0);
+    expect(get.body.data.en.hero.title).toBe(DEFAULT_TRANSLATIONS.en.hero.title);
+
+    const created = await call('post', '/api/admin/projects', validProject());
+    expect(created.status).toBe(500);
+    expect(await projectIds(call)).toHaveLength(DEFAULT_PROJECTS_COUNT);
+  });
+
+  it('el límite de 50 se comprueba dentro del servicio', async () => {
+    const { db, clock } = await setup();
+    const current = await countProjects(db);
+    await db.insert(projects).values(
+      Array.from({ length: 50 - current }, (_, i) => ({
+        slug: `r-${i}`, position: 100 + i, title: 't', descriptionEn: 'd', descriptionEs: 'd',
+        imageUrl: 'https://res.cloudinary.com/demo/a.png', tech: ['react'],
+        createdAt: clock.now(), updatedAt: clock.now(),
+      })),
+    );
+    const { createProject } = await import('../../server/services/content.js');
+    await expect(createProject(db, { data: validProject(), now: clock.now() })).rejects.toMatchObject({
+      status: 400,
+      code: 'limit_reached',
+    });
   });
 });
