@@ -5,6 +5,7 @@ import { hasRecentAlerts } from './lib/alerts.js'
 import TranslationsTab from './tabs/TranslationsTab.jsx'
 import ProjectsTab from './tabs/ProjectsTab.jsx'
 import ThemeTab from './tabs/ThemeTab.jsx'
+import SecurityTab from './tabs/SecurityTab.jsx'
 
 const triggerClass =
   'px-4 py-2 text-sm text-white/70 border-b-2 border-transparent data-[state=active]:border-purple-400 data-[state=active]:text-white'
@@ -64,6 +65,7 @@ export default function Dashboard({ csrf, onLoggedOut }) {
           <Tabs.Trigger value="texts" className={triggerClass}>Textos</Tabs.Trigger>
           <Tabs.Trigger value="projects" className={triggerClass}>Proyectos</Tabs.Trigger>
           <Tabs.Trigger value="theme" className={triggerClass}>Tema</Tabs.Trigger>
+          <Tabs.Trigger value="security" className={triggerClass}>Seguridad</Tabs.Trigger>
         </Tabs.List>
         <Tabs.Content value="texts" className="pt-4">
           <TranslationsTab call={call} />
@@ -73,6 +75,9 @@ export default function Dashboard({ csrf, onLoggedOut }) {
         </Tabs.Content>
         <Tabs.Content value="theme" className="pt-4">
           <ThemeTab call={call} />
+        </Tabs.Content>
+        <Tabs.Content value="security" className="pt-4">
+          <SecurityTab call={call} onLoggedOut={onLoggedOut} />
         </Tabs.Content>
       </Tabs.Root>
     </main>
