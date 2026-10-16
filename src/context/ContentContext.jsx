@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
 import { DEFAULT_TRANSLATIONS, DEFAULT_PROJECTS } from '@/content/defaults';
 import { mergeContent } from '@/content/merge';
 
@@ -44,8 +44,7 @@ const ContentProvider = ({ children }) => {
     };
   }, []);
 
-  const value = useMemo(() => content, [content]);
-  return <ContentContext.Provider value={value}>{children}</ContentContext.Provider>;
+  return <ContentContext.Provider value={content}>{children}</ContentContext.Provider>;
 };
 
 export default ContentProvider;

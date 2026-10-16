@@ -19,13 +19,55 @@ function mergeStrings(base, remote) {
   return out;
 }
 
-const isValidProject = (p) =>
-  isPlainObject(p) &&
-  isString(p.id) &&
-  isString(p.title) &&
-  isString(p.imageUrl) &&
-  Array.isArray(p.tech) &&
-  p.tech.every(isString);
+const IMAGE_HOSTS = ['res.cloudinary.com', 'upload.wikimedia.org'];
+
+// Solo https (igual que el servidor); cualquier otra cosa se descarta.
+function safeUrl(value) {
+  if (!isString(value) || value === '') return null;
+  try {
+    const u = new URL(value);
+    return u.protocol === 'https:' ? u.href : null;
+  } catch {
+    return null;
+  }
+}
+
+function safeImageUrl(value) {
+  if (!isString(value)) return null;
+  try {
+    const u = new URL(value);
+    return u.protocol === 'https:' && IMAGE_HOSTS.includes(u.hostname) ? u.href : null;
+  } catch {
+    return null;
+  }
+}
+
+// Devuelve el proyecto saneado o null si no es válido.
+function sanitizeProject(p) {
+  if (
+    !isPlainObject(p) ||
+    !isString(p.id) ||
+    !isString(p.title) ||
+    !isString(p.descriptionEn) ||
+    !isString(p.descriptionEs) ||
+    !Array.isArray(p.tech) ||
+    !p.tech.every(isString)
+  ) {
+    return null;
+  }
+  const imageUrl = safeImageUrl(p.imageUrl);
+  if (!imageUrl) return null;
+  return { ...p, imageUrl, liveUrl: safeUrl(p.liveUrl), githubUrl: safeUrl(p.githubUrl) };
+}
+
+function mergeProjects(defaults, remote) {
+  // Sin traducciones remotas la BD no está sembrada: se ignoran también los proyectos.
+  if (!isPlainObject(remote.translations) || !Array.isArray(remote.projects)) return defaults.projects;
+  const list = remote.projects.map(sanitizeProject);
+  // Un elemento de forma inválida invalida la lista; uno con imagen ajena solo se descarta.
+  if (remote.projects.some((p) => !isPlainObject(p) || !isString(p.id))) return defaults.projects;
+  return list.filter(Boolean);
+}
 
 function sanitizeTheme(theme) {
   if (!isPlainObject(theme) || !isPlainObject(theme.vars)) return null;
@@ -44,8 +86,7 @@ export function mergeContent(defaults, remote) {
       en: mergeStrings(defaults.translations.en, rt.en),
       es: mergeStrings(defaults.translations.es, rt.es),
     },
-    projects:
-      Array.isArray(r.projects) && r.projects.every(isValidProject) ? r.projects : defaults.projects,
+    projects: mergeProjects(defaults, r),
     theme: sanitizeTheme(r.theme),
   };
 }

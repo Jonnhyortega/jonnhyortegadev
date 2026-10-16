@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { Environment, Lightformer, Sparkles } from '@react-three/drei';
 import * as THREE from 'three';
+import { buildKnotVertexColors } from './knotColors';
 import useThemeColor from '@/hooks/useThemeColor';
 
 /**
@@ -46,22 +47,12 @@ function useSceneColors() {
 
 function KnotGeometry({ mobile, colors }) {
   const geometry = useMemo(() => {
-    const BRAND = {
-      violet: new THREE.Color(colors.violet),
-      magenta: new THREE.Color(colors.magenta),
-      gold: new THREE.Color(colors.gold),
-    };
     const g = new THREE.TorusKnotGeometry(1, 0.34, mobile ? 120 : 260, mobile ? 16 : 48, 2, 3);
-    const pos = g.attributes.position;
-    const colors = new Float32Array(pos.count * 3);
-    const tmp = new THREE.Color();
-    for (let i = 0; i < pos.count; i += 1) {
-      const t = 0.5 + 0.5 * Math.sin(pos.getX(i) * 1.4 + pos.getY(i) * 1.8 + pos.getZ(i) * 0.8);
-      if (t < 0.55) tmp.copy(BRAND.violet).lerp(BRAND.magenta, t / 0.55);
-      else tmp.copy(BRAND.magenta).lerp(BRAND.gold, (t - 0.55) / 0.45);
-      colors.set([tmp.r, tmp.g, tmp.b], i * 3);
-    }
-    g.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    const vertexColors = buildKnotVertexColors(
+      { violet: colors.violet, magenta: colors.magenta, gold: colors.gold },
+      g.attributes.position,
+    );
+    g.setAttribute('color', new THREE.BufferAttribute(vertexColors, 3));
     return g;
   }, [mobile, colors.violet, colors.magenta, colors.gold]);
 
