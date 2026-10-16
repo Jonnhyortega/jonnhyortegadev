@@ -1,4 +1,5 @@
 import { HttpError, NotFoundError } from '../lib/errors.js';
+import { InvalidInputError } from './validate.js';
 
 export function notFoundHandler(req, res, next) {
   next(new NotFoundError());
@@ -10,6 +11,9 @@ export function notFoundHandler(req, res, next) {
 export function errorHandler(err, req, res, next) {
   if (res.headersSent) return next(err);
 
+  if (err instanceof InvalidInputError) {
+    return res.status(400).json({ error: err.code, fields: err.fields });
+  }
   if (err instanceof HttpError) {
     return res.status(err.status).json({ error: err.code });
   }

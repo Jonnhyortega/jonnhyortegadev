@@ -3,6 +3,8 @@ import { productionOnly } from '../../middleware/productionOnly.js';
 import { loadSession, requireSession } from '../../middleware/session.js';
 import { requireCsrf } from '../../middleware/csrf.js';
 import { rateLimit } from '../../middleware/rateLimit.js';
+import { createTranslationsRouter } from './translations.js';
+import { createThemeRouter } from './theme.js';
 import { SAFE_METHODS } from '../../middleware/jsonOnly.js';
 
 const MIN = 60_000;
@@ -39,6 +41,9 @@ export function createAdminRouter(deps) {
 
   // Puerta full-only: falla cerrado para cualquier subrouter futuro.
   router.use(requireSession('full'));
+
+  router.use('/translations', createTranslationsRouter(deps));
+  router.use('/theme', createThemeRouter(deps));
 
   return router;
 }
