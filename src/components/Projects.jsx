@@ -2,6 +2,7 @@ import React, { useRef } from 'react';
 import { motion, useScroll, useTransform, useMotionValue } from 'framer-motion';
 import { ExternalLink, Github } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
+import { DEFAULT_PROJECTS } from '@/content/defaults';
 import TiltCard from '@/components/fx/TiltCard';
 import SectionHeading from '@/components/fx/SectionHeading';
 import useMediaQuery from '@/hooks/useMediaQuery';
@@ -64,100 +65,13 @@ const TechIcon = ({ type }) => {
 };
 
 const Projects = () => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
 
-  const projects = [
-    {
-      id: 1,
-      title: 'Ls Motos',
-      description: t('projects.lsmotos.description'),
-      image: 'https://res.cloudinary.com/do87isqjr/image/upload/v1790638270/combinado_motos_negro_qcrc2g.jpg',
-      tech: ['next', 'tailwind', 'css3'],
-      liveUrl: 'https://lsmotos.com',
-      githubUrl: 'https://github.com/Jonnhyortega/JonathanOrtega-Proyects',
-    },
-    {
-      id: 2,
-      title: 'API Chatbot',
-      description: t('projects.chatbot.description'),
-      image: 'https://upload.wikimedia.org/wikipedia/commons/9/93/Amazon_Web_Services_Logo.svg',
-      tech: ['aws', 'python', 'docker'],
-      liveUrl: 'https://2j5uuy7hcg.execute-api.us-east-1.amazonaws.com',
-      githubUrl: 'https://github.com/Jonnhyortega/ia-portfolio',
-    },
-    {
-      id: 3,
-      title: 'Controlia',
-      description: t('projects.controlia.description'),
-      image: 'https://res.cloudinary.com/do87isqjr/image/upload/v1764769583/Captura_de_pantalla_2025-12-03_104451-removebg-preview_a13tvh.png',
-      tech: ['next', 'node', 'typescript', 'mongo'],
-      liveUrl: 'https://controlia-software.vercel.app/',
-      githubUrl: 'https://github.com/Jonnhyortega/controlia-software',
-    },
-    {
-      id: 6,
-      title: 'Estudio juridico Rokotovich',
-      description: t('projects.rokotovich.description'),
-      image: 'https://res.cloudinary.com/do87isqjr/image/upload/v1764261488/logo-sinfondo_lbgdzo.png',
-      tech: ['next', 'js', 'css3'],
-      liveUrl: 'https://www.estudiorokotovich.com/',
-      githubUrl: 'https://github.com/Jonnhyortega/rokotovich',
-    },
-    {
-      id: 7,
-      title: 'HC Habilitaciones',
-      description: t('projects.hc.description'),
-      image: 'https://res.cloudinary.com/do87isqjr/image/upload/v1764194887/hc-removebg-preview_zo1jou.png',
-      tech: ['next', 'css3', 'js'],
-      liveUrl: 'https://gestioncomercialhc.com',
-      githubUrl: 'https://github.com/Jonnhyortega/hc',
-    },
-    {
-      id: 8,
-      title: 'Chulos Design',
-      description: t('projects.chulos.description'),
-      image: 'https://res.cloudinary.com/do87isqjr/image/upload/v1764194680/Logo-removebg-preview_1_qr35lb.png',
-      tech: ['react', 'css3', 'js'],
-      liveUrl: 'https://landingchulos.vercel.app/',
-      githubUrl: 'https://github.com/Jonnhyortega/landingchulos',
-    },
-    {
-      id: 9,
-      title: 'Sanitarios Lugano',
-      description: t('projects.sanitarios.description'),
-      image: 'https://res.cloudinary.com/do87isqjr/image/upload/v1764196473/SanitariosLugano-removebg-preview_vms5em.png',
-      tech: ['react', 'css3', 'js'],
-      liveUrl: 'https://sanitarioslugano.vercel.app',
-      githubUrl: 'https://github.com/Jonnhyortega/sanitarioslugano',
-    },
-    {
-      id: 10,
-      title: 'Sublime Kids',
-      description: t('projects.wuwei.description'),
-      image: 'https://res.cloudinary.com/do87isqjr/image/upload/v1790637089/logo-color_v9mqkv.jpg',
-      tech: ['tn', 'css3'],
-      liveUrl: 'https://tiendadesublimekids26.mitiendanube.com/',
-      githubUrl: 'https://github.com',
-    },
-    {
-      id: 11,
-      title: 'Casa Molinas',
-      description: t('projects.casa.description'),
-      image: 'https://res.cloudinary.com/do87isqjr/image/upload/v1764189657/logoCM-removebg-preview_ozwejp.png',
-      tech: ['tn', 'css3'],
-      liveUrl: 'https://casamolinas.mitiendanube.com/',
-      // githubUrl: 'https://github.com',
-    },
-    // {
-    //   id: 12,
-    //   title: 'Viandas H&G',
-    //   description: t('projects.viandashyg.description'),
-    //   image: 'https://res.cloudinary.com/do87isqjr/image/upload/v1764201568/hyg-logo-removebg-preview_vjq36t.png',
-    //   tech: ['tn', 'css3'],
-    //   liveUrl: 'https://viandashyg.mitiendanube.com/',
-    //   // githubUrl: 'https://github.com',
-    // },
-  ];
+  const projects = DEFAULT_PROJECTS.map((project) => ({
+    ...project,
+    description: language === 'en' ? project.descriptionEn : project.descriptionEs,
+    image: project.imageUrl,
+  }));
 
   const sectionRef = useRef(null);
   const isDesktop = useMediaQuery('(min-width: 1024px)');

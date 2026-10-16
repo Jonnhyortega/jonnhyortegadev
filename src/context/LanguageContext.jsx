@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState } from 'react';
+import { DEFAULT_TRANSLATIONS } from '@/content/defaults';
 
 const LanguageContext = createContext();
 
@@ -10,178 +11,12 @@ export const useLanguage = () => {
   return context;
 };
 
-const translations = {
-    en: {
-    chatbot: {
-    header: "Jonathan Ortega’s Assistant Chatbot",
-    presentacion: "Hello! I’m Jonson AI, the smart assistant of Jonathan Ortega’s portfolio. How can I help you today?",
-    inputPlaceholder: "Type your message...",
-    sendButton: "Send",
-    loadingMessage: "Typing...",
-    openButton: "Open Chat",
-    quickReplies: {
-      budget: "How can I request a quote?",
-      social: "Social Media"
-    },
-    follow: "Follow me on",
-    and: "and"
-  },
-    nav: {
-      home: 'Home',
-      projects: 'Projects',
-      skills: 'Skills',
-      contact: 'Contact',
-    },
-    hero: {
-      title: 'Full Stack Developer',
-      subtitle: 'Building modern web applications with cutting-edge technologies',
-      cta: 'View Projects',
-      contact: 'Get In Touch',
-    },
-    projects: {
-      title: 'My Projects',
-      subtitle: 'A showcase of my latest work and achievements',
-      lsmotos: {
-        description: 'Interactive website built with Next Js and modern web technologies',
-      },
-      chatbot: {
-        description: 'AI-powered chatbot API deployed on AWS Lambda with serverless architecture',
-      },
-      hc: {
-        description: 'Business website for commercial licensing and permits',
-      },
-      astral: {
-        description: 'React Router implementation with modern component design',
-      },
-      controlia: {
-        description: 'Application for managing businesses',
-      },
-      chulos: {
-        description: 'Responsive landing page with modern design principles',
-      },
-      sanitarios: {
-        description: 'Website for sanitary products and fixtures',
-      },
-      wuwei: {
-        description: 'Video platform with interactive features and modern UI',
-      },
-      casa: {
-        description: 'Real estate showcase website with elegant design',
-      },
-      viandashyg: {
-        description: 'online store for a food business',
-      },
-      rokotovich: {
-        description: 'Website for a law firm, soon to be launched.'},
-      live: 'See demo',
-      code: 'Source Code',
-    },
-    skills: {
-      title: 'Technologies',
-      subtitle: 'Tools and frameworks I work with',
-    },
-    contact: {
-      title: 'Get In Touch',
-      subtitle: "Let's discuss your next project",
-      direct: 'Or email me directly at:',
-      send: 'Send Email',
-    },
-    footer: {
-      made: 'Made',
-      by: 'by',
-      rights: 'All rights reserved.',
-    },
-  },
-  es: {
-      chatbot: {
-  header: "Chatbot Asistente de Jonathan Ortega",
-  presentacion: "¡Hola! Soy Jonson IA, el asistente inteligente del portafolio de Jonathan Ortega. ¿En qué puedo ayudarte hoy?",
-  inputPlaceholder: "Escribe tu mensaje aquí...",
-  sendButton: "Enviar",
-  loadingMessage: "escribiendo...",
-  openButton: "Abrir chat",
-  quickReplies: {
-    budget: "¿Cómo puedo pedir un presupuesto?",
-    social: "Redes sociales"
-  },
-  follow: "Sígueme en",
-  and: "y"
-    },
-    nav: {
-      home: 'Inicio',
-      projects: 'Proyectos',
-      skills: 'Habilidades',
-      contact: 'Contacto',
-    },
-    hero: {
-      title: 'Desarrollador Full Stack',
-      subtitle: 'Construyendo aplicaciones web modernas con tecnologías de vanguardia',
-      cta: 'Ver Proyectos',
-      contact: 'Contáctame',
-    },
-    projects: {
-      title: 'Mis Proyectos',
-      subtitle: 'Una muestra de mis últimos trabajos y logros',
-      lsmotos: {
-        description: 'Sitio web interactivo construido con Next.js y tecnologías web modernas',
-      },
-      chatbot: {
-        description: 'API de chatbot con IA desplegada en AWS Lambda con arquitectura serverless',
-      },
-      hc: {
-        description: 'Sitio web empresarial para habilitaciones y permisos comerciales',
-      },
-      astral: {
-        description: 'Sitio web para agencia de diseño web',
-      },
-      controlia: {
-        description: 'Sistema para gestion de comercios',
-      },
-      chulos: {
-        description: 'Página de aterrizaje responsiva con principios de diseño moderno para empresa de muebles',
-      },
-      sanitarios: {
-        description: 'Sitio web de comercio de productos sanitarios',
-      },
-      wuwei: {
-        description: 'Plataforma de video con características interactivas e interfaz moderna',
-      },
-      casa: {
-        description: 'Sitio web de bienes raíces con diseño elegante',
-      },
-      viandashyg: {
-        description: 'Tienda online para empresa gastronomica de viandas',
-      },
-      rokotovich: {
-        description: 'Sitio web para estudio juridico, proximo a lanzar.',
-      },
-      live: 'Ver demo',
-      code: 'Código Fuente',
-    },
-    skills: {
-      title: 'Tecnologías',
-      subtitle: 'Herramientas y frameworks con los que trabajo',
-    },
-    contact: {
-      title: 'Contacto',
-      subtitle: 'Hablemos sobre tu próximo proyecto',
-      direct: 'O envíame un correo directamente a:',
-      send: 'Enviar Email',
-    },
-    footer: {
-      made: 'Hecho',
-      by: 'por',
-      rights: 'Todos los derechos reservados.',
-    },
-  },
-};
-
 const LanguageProvider = ({ children }) => {
   const [language, setLanguage] = useState('es');
 
   const t = (key) => {
     const keys = key.split('.');
-    let value = translations[language];
+    let value = DEFAULT_TRANSLATIONS[language];
     for (const k of keys) {
       value = value?.[k];
     }
