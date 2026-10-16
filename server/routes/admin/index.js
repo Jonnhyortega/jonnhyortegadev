@@ -5,6 +5,7 @@ import { requireCsrf } from '../../middleware/csrf.js';
 import { rateLimit } from '../../middleware/rateLimit.js';
 import { createTranslationsRouter } from './translations.js';
 import { createThemeRouter } from './theme.js';
+import { createProjectsRouter } from './projects.js';
 import { SAFE_METHODS } from '../../middleware/jsonOnly.js';
 
 const MIN = 60_000;
@@ -44,6 +45,7 @@ export function createAdminRouter(deps) {
 
   router.use('/translations', createTranslationsRouter(deps));
   router.use('/theme', createThemeRouter(deps));
+  router.use('/projects', createProjectsRouter(deps));
 
   return router;
 }
