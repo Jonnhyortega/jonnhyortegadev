@@ -19,7 +19,7 @@ html {
 }
 
 ::selection {
-  background: rgba(168, 85, 247, 0.45);
+  background: rgb(var(--c-purple-500, 168 85 247) / 0.45);
   color: #fff;
 }
 

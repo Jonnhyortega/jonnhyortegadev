@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { Environment, Lightformer, Sparkles } from '@react-three/drei';
 import * as THREE from 'three';
+import useThemeColor from '@/hooks/useThemeColor';
 
 /**
  * Escena 3D fija de fondo. Un único objeto (nudo toroidal con degradé
@@ -30,14 +31,26 @@ const smooth = (t) => t * t * (3 - 2 * t);
 const lerp = THREE.MathUtils.lerp;
 const damp = THREE.MathUtils.damp;
 
-const BRAND = {
-  violet: new THREE.Color('#7c3aed'),
-  magenta: new THREE.Color('#c026d3'),
-  gold: new THREE.Color('#facc15'),
-};
+// Colores de la escena: salen de las variables CSS del tema (el hex es el respaldo).
+function useSceneColors() {
+  return {
+    violet: useThemeColor('--c-violet-600', '#7c3aed'),
+    magenta: useThemeColor('--c-fuchsia-600', '#c026d3'),
+    gold: useThemeColor('--c-yellow-400', '#facc15'),
+    purple: useThemeColor('--c-purple-500', '#a855f7'),
+    violetSoft: useThemeColor('--c-violet-400', '#a78bfa'),
+    violetLight: useThemeColor('--c-violet-300', '#c4b5fd'),
+    fuchsiaLight: useThemeColor('--c-fuchsia-300', '#f0abfc'),
+  };
+}
 
-function KnotGeometry({ mobile }) {
+function KnotGeometry({ mobile, colors }) {
   const geometry = useMemo(() => {
+    const BRAND = {
+      violet: new THREE.Color(colors.violet),
+      magenta: new THREE.Color(colors.magenta),
+      gold: new THREE.Color(colors.gold),
+    };
     const g = new THREE.TorusKnotGeometry(1, 0.34, mobile ? 120 : 260, mobile ? 16 : 48, 2, 3);
     const pos = g.attributes.position;
     const colors = new Float32Array(pos.count * 3);
@@ -50,13 +63,13 @@ function KnotGeometry({ mobile }) {
     }
     g.setAttribute('color', new THREE.BufferAttribute(colors, 3));
     return g;
-  }, [mobile]);
+  }, [mobile, colors.violet, colors.magenta, colors.gold]);
 
   useEffect(() => () => geometry.dispose(), [geometry]);
   return <primitive object={geometry} attach="geometry" />;
 }
 
-function Orbiter({ radius, speed, offset, size = 0.07, color = '#facc15' }) {
+function Orbiter({ radius, speed, offset, size = 0.07, color }) {
   const ref = useRef();
   useFrame((state) => {
     const a = state.clock.elapsedTime * speed + offset;
@@ -82,7 +95,7 @@ function Ring({ radius, tilt, color, opacity = 0.35, children }) {
   );
 }
 
-function Rig({ mobile, reduced }) {
+function Rig({ mobile, reduced, colors }) {
   const group = useRef();
   const knot = useRef();
   const rings = useRef();
@@ -160,13 +173,13 @@ function Rig({ mobile, reduced }) {
   return (
     <>
       <group ref={dust}>
-        <Sparkles count={mobile ? 50 : 130} scale={[16, 10, 8]} size={2.6} speed={0.25} opacity={0.8} color="#a78bfa" />
-        <Sparkles count={mobile ? 25 : 60} scale={[14, 9, 7]} size={3.2} speed={0.35} opacity={0.9} color="#facc15" />
+        <Sparkles count={mobile ? 50 : 130} scale={[16, 10, 8]} size={2.6} speed={0.25} opacity={0.8} color={colors.violetSoft} />
+        <Sparkles count={mobile ? 25 : 60} scale={[14, 9, 7]} size={3.2} speed={0.35} opacity={0.9} color={colors.gold} />
       </group>
 
       <group ref={group} scale={0.01}>
         <mesh ref={knot}>
-          <KnotGeometry mobile={mobile} />
+          <KnotGeometry mobile={mobile} colors={colors} />
           <meshPhysicalMaterial
             vertexColors
             metalness={0.9}
@@ -181,16 +194,16 @@ function Rig({ mobile, reduced }) {
         </mesh>
 
         <group ref={rings}>
-          <Ring radius={2.1} tilt={[1.2, 0.2, 0]} color="#facc15" opacity={0.4}>
-            <Orbiter radius={2.1} speed={0.7} offset={0} />
+          <Ring radius={2.1} tilt={[1.2, 0.2, 0]} color={colors.gold} opacity={0.4}>
+            <Orbiter radius={2.1} speed={0.7} offset={0} color={colors.gold} />
           </Ring>
-          <Ring radius={2.7} tilt={[0.5, 0.9, 0.3]} color="#a855f7" opacity={0.45}>
-            <Orbiter radius={2.7} speed={-0.45} offset={2} color="#c4b5fd" size={0.06} />
-            <Orbiter radius={2.7} speed={-0.45} offset={4.5} color="#facc15" size={0.045} />
+          <Ring radius={2.7} tilt={[0.5, 0.9, 0.3]} color={colors.purple} opacity={0.45}>
+            <Orbiter radius={2.7} speed={-0.45} offset={2} color={colors.violetLight} size={0.06} />
+            <Orbiter radius={2.7} speed={-0.45} offset={4.5} color={colors.gold} size={0.045} />
           </Ring>
           {!mobile && (
-            <Ring radius={3.3} tilt={[1.0, -0.5, 0.8]} color="#f0abfc" opacity={0.25}>
-              <Orbiter radius={3.3} speed={0.3} offset={1} color="#f0abfc" size={0.05} />
+            <Ring radius={3.3} tilt={[1.0, -0.5, 0.8]} color={colors.fuchsiaLight} opacity={0.25}>
+              <Orbiter radius={3.3} speed={0.3} offset={1} color={colors.fuchsiaLight} size={0.05} />
             </Ring>
           )}
         </group>
@@ -228,6 +241,7 @@ export default function Scene() {
   const mobile = useMemo(() => window.matchMedia('(max-width: 767px)').matches, []);
   const reduced = useMemo(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches, []);
   const supported = useMemo(webglSupported, []);
+  const colors = useSceneColors();
 
   if (!supported) return null;
 
@@ -248,18 +262,18 @@ export default function Scene() {
           onCreated={() => setReady(true)}
         >
           <ambientLight intensity={0.25} />
-          <pointLight position={[4, 3, 4]} color="#a855f7" intensity={70} />
-          <pointLight position={[-4, -2, 3]} color="#facc15" intensity={55} />
+          <pointLight position={[4, 3, 4]} color={colors.purple} intensity={70} />
+          <pointLight position={[-4, -2, 3]} color={colors.gold} intensity={55} />
 
           {/* Entorno procedural: no descarga HDRIs externos */}
-          <Environment resolution={256} frames={1}>
-            <Lightformer form="rect" intensity={4} color="#a855f7" position={[-5, 3, -2]} scale={[9, 4, 1]} />
-            <Lightformer form="rect" intensity={4} color="#facc15" position={[5, -2, -1]} scale={[9, 3, 1]} />
-            <Lightformer form="ring" intensity={3} color="#f0abfc" position={[0, 4, 3]} scale={4} />
+          <Environment key={`${colors.purple}${colors.gold}${colors.fuchsiaLight}`} resolution={256} frames={1}>
+            <Lightformer form="rect" intensity={4} color={colors.purple} position={[-5, 3, -2]} scale={[9, 4, 1]} />
+            <Lightformer form="rect" intensity={4} color={colors.gold} position={[5, -2, -1]} scale={[9, 3, 1]} />
+            <Lightformer form="ring" intensity={3} color={colors.fuchsiaLight} position={[0, 4, 3]} scale={4} />
             <Lightformer form="rect" intensity={2} color="#ffffff" position={[0, 0, 6]} scale={[10, 2, 1]} />
           </Environment>
 
-          <Rig mobile={mobile} reduced={reduced} />
+          <Rig mobile={mobile} reduced={reduced} colors={colors} />
         </Canvas>
       </div>
     </SceneBoundary>

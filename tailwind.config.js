@@ -1,3 +1,20 @@
+import colors from 'tailwindcss/colors';
+
+// Convierte "#rrggbb" en "r g b" para usarlo como valor por defecto de la variable CSS.
+const hexToTriplet = (hex) => {
+  const n = parseInt(hex.slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255].join(' ');
+};
+
+// Cada tono lee su variable --c-<paleta>-<tono>; sin ella queda el color oficial de Tailwind 3.
+const editablePalette = (name) =>
+  Object.fromEntries(
+    Object.entries(colors[name]).map(([shade, hex]) => [
+      shade,
+      `rgb(var(--c-${name}-${shade}, ${hexToTriplet(hex)}) / <alpha-value>)`,
+    ]),
+  );
+
 export default {
   content: [
     "./index.html",
@@ -11,8 +28,12 @@ export default {
         mono: ['"JetBrains Mono"', 'ui-monospace', 'SFMono-Regular', 'monospace'],
       },
       colors: {
+        purple: editablePalette('purple'),
+        violet: editablePalette('violet'),
+        fuchsia: editablePalette('fuchsia'),
+        yellow: editablePalette('yellow'),
         ink: {
-          DEFAULT: '#07030f',
+          DEFAULT: 'rgb(var(--c-ink, 7 3 15) / <alpha-value>)',
           900: '#0b0618',
           800: '#120a24',
           700: '#1a1033',
