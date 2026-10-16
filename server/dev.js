@@ -1,5 +1,6 @@
 import { loadEnv } from './config/env.js';
 import { createDb } from './db/client.js';
+import { createGoogleClient } from './services/google.js';
 import { createApp } from './app.js';
 import { createSession, SESSION_COOKIE } from './services/sessions.js';
 import { assertDevFakeSessionAllowed } from './config/devSession.js';
@@ -31,18 +32,7 @@ const env = fakeSession
   : loadedEnv;
 const db = createDb(env.databaseUrl);
 
-// Stub hasta que exista el cliente real de Google (Task 9).
-const google = {
-  buildAuthUrl() {
-    throw new Error('google client not configured');
-  },
-  exchangeCode() {
-    throw new Error('google client not configured');
-  },
-  verifyIdToken() {
-    throw new Error('google client not configured');
-  },
-};
+const google = createGoogleClient(env);
 
 const app = createApp({ env, db, google });
 

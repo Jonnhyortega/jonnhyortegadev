@@ -4,6 +4,7 @@ import { security } from './middleware/security.js';
 import { jsonOnly } from './middleware/jsonOnly.js';
 import { notFoundHandler, errorHandler } from './middleware/errors.js';
 import { createAdminRouter } from './routes/admin/index.js';
+import { createAuthRouter } from './routes/auth.js';
 
 // `testRoutes` es un Router que existe SOLO para tests (se monta antes del
 // 404). `api/index.js` nunca lo pasa.
@@ -29,5 +30,6 @@ export function createApp({ env, db, google, now = () => new Date() }, { testRou
 
 // Los routers de cada módulo se montan aquí.
 function mountApiRoutes(app, deps) {
+  app.use('/api/auth', createAuthRouter(deps));
   app.use('/api/admin', createAdminRouter(deps));
 }
