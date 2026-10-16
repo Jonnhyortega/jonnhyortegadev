@@ -4,6 +4,7 @@ import { api, ApiError } from './api.js'
 import { hasRecentAlerts } from './lib/alerts.js'
 import TranslationsTab from './tabs/TranslationsTab.jsx'
 import ProjectsTab from './tabs/ProjectsTab.jsx'
+import ThemeTab from './tabs/ThemeTab.jsx'
 
 const triggerClass =
   'px-4 py-2 text-sm text-white/70 border-b-2 border-transparent data-[state=active]:border-purple-400 data-[state=active]:text-white'
@@ -62,12 +63,16 @@ export default function Dashboard({ csrf, onLoggedOut }) {
         <Tabs.List aria-label="Secciones del panel" className="flex flex-wrap border-b border-purple-500/20">
           <Tabs.Trigger value="texts" className={triggerClass}>Textos</Tabs.Trigger>
           <Tabs.Trigger value="projects" className={triggerClass}>Proyectos</Tabs.Trigger>
+          <Tabs.Trigger value="theme" className={triggerClass}>Tema</Tabs.Trigger>
         </Tabs.List>
         <Tabs.Content value="texts" className="pt-4">
           <TranslationsTab call={call} />
         </Tabs.Content>
         <Tabs.Content value="projects" className="pt-4">
           <ProjectsTab call={call} />
+        </Tabs.Content>
+        <Tabs.Content value="theme" className="pt-4">
+          <ThemeTab call={call} />
         </Tabs.Content>
       </Tabs.Root>
     </main>
