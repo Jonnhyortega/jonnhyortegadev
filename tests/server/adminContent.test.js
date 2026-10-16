@@ -291,3 +291,95 @@ describe('admin projects', () => {
     expect(res.status).toBe(404);
   });
 });
+
+describe('admin revisions', () => {
+  it('lista las revisiones de una entidad con id y createdAt; entidad desconocida 404', async () => {
+    const { call } = await setup();
+    await call('put', '/api/admin/translations', { data: clone(DEFAULT_TRANSLATIONS), version: 0 });
+    const res = await call('get', '/api/admin/revisions/translations');
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveLength(1);
+    expect(Object.keys(res.body[0]).sort()).toEqual(['createdAt', 'id']);
+    const bad = await call('get', '/api/admin/revisions/users');
+    expect(bad.status).toBe(404);
+  });
+
+  it('devuelve como máximo las últimas 30', async () => {
+    const { call, db, clock } = await setup();
+    await db.insert(contentRevisions).values(
+      Array.from({ length: 35 }, () => ({ entity: 'theme', data: DEFAULT_THEME, createdAt: clock.now() })),
+    );
+    const res = await call('get', '/api/admin/revisions/theme');
+    expect(res.body).toHaveLength(30);
+  });
+
+  it('restaurar una revisión de textos devuelve el contenido anterior y sube la versión', async () => {
+    const { call, app } = await setup();
+    const first = clone(DEFAULT_TRANSLATIONS);
+    first.en.hero.title = 'Primera';
+    await call('put', '/api/admin/translations', { data: first, version: 0 });
+    const second = clone(DEFAULT_TRANSLATIONS);
+    second.en.hero.title = 'Segunda';
+    await call('put', '/api/admin/translations', { data: second, version: 1 });
+
+    const revs = (await call('get', '/api/admin/revisions/translations')).body;
+    expect(revs).toHaveLength(2);
+    const res = await call('post', `/api/admin/revisions/${revs[1].id}/restore`);
+    expect(res.status).toBe(200);
+    expect(res.body.version).toBe(3);
+    const pub = await request(app).get('/api/content');
+    expect(pub.body.translations.en.hero.title).toBe('Primera');
+  });
+
+  it('restaurar una revisión de proyectos recupera el proyecto borrado', async () => {
+    const { call } = await setup();
+    const created = await call('post', '/api/admin/projects', validProject({ title: 'Efímero' }));
+    const withIt = await projectIds(call);
+    await call('delete', `/api/admin/projects/${created.body.id}`);
+    expect(await projectIds(call)).not.toContain(created.body.id);
+
+    const revs = (await call('get', '/api/admin/revisions/projects')).body;
+    expect(revs).toHaveLength(2);
+    const res = await call('post', `/api/admin/revisions/${revs[1].id}/restore`);
+    expect(res.status).toBe(200);
+    expect(await projectIds(call)).toEqual(withIt);
+  });
+
+  it('registra revision_restored con entity; id no UUID o inexistente 404', async () => {
+    const { call, db } = await setup();
+    await call('put', '/api/admin/theme', { data: { ...DEFAULT_THEME, primary: '#112233' }, version: 0 });
+    const [rev] = (await call('get', '/api/admin/revisions/theme')).body;
+    const res = await call('post', `/api/admin/revisions/${rev.id}/restore`);
+    expect(res.status).toBe(200);
+    const rows = await db.select().from(auditLog).where(eq(auditLog.event, 'revision_restored'));
+    expect(rows.map((r) => r.meta)).toEqual([{ entity: 'theme' }]);
+
+    expect((await call('post', '/api/admin/revisions/abc/restore')).status).toBe(404);
+    expect((await call('post', '/api/admin/revisions/00000000-0000-4000-8000-000000000000/restore')).status).toBe(404);
+  });
+
+  it('revisión incompatible: 409 revision_incompatible', async () => {
+    const { call, db, clock } = await setup();
+    const [rev] = await db
+      .insert(contentRevisions)
+      .values({ entity: 'theme', data: { primary: 'no-es-color' }, createdAt: clock.now() })
+      .returning();
+    const res = await call('post', `/api/admin/revisions/${rev.id}/restore`);
+    expect(res.status).toBe(409);
+    expect(res.body).toEqual({ error: 'revision_incompatible' });
+  });
+
+  it('sin CSRF: 403; sesión recovery: 404', async () => {
+    const ctx = await setup();
+    const noCsrf = await ctx.call(
+      'post',
+      '/api/admin/revisions/00000000-0000-4000-8000-000000000000/restore',
+      undefined,
+      { csrf: null },
+    );
+    expect(noCsrf.status).toBe(403);
+    const rec = await loginAs(ctx, 'recovery');
+    const res = await ctx.call('get', '/api/admin/revisions/theme', undefined, { csrf: rec.csrf, cookie: rec.cookie });
+    expect(res.status).toBe(404);
+  });
+});
