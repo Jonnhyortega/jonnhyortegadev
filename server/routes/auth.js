@@ -6,8 +6,12 @@ import { safeEqual, sha256 } from '../lib/crypto.js';
 import { productionOnly } from '../middleware/productionOnly.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 import { loadSession, requireSession } from '../middleware/session.js';
-import { requireCsrf } from '../middleware/csrf.js';
+import { requireCsrf, requireSameOrigin } from '../middleware/csrf.js';
+import { HttpError } from '../lib/errors.js';
+import { recoveryRequestSchema } from '../schemas/auth.js';
 import { recordAudit, requestContext } from '../services/audit.js';
+import { getLock, registerFailure } from '../services/rateLimit.js';
+import { consumeRecoveryCode, normalizeCode } from '../services/recoveryCodes.js';
 import {
   OAUTH_COOKIE,
   clearFlowCookie,
@@ -25,10 +29,12 @@ import {
 } from '../services/sessions.js';
 
 const MIN = 60_000;
+const HOUR = 60 * MIN;
+const RECOVERY_LOCK_KEY = 'recovery:global';
 // La middleware (Task 15) convierte esta ruta en un 302 hacia el panel.
 const PANEL_RETURN = '/__panel-return';
 
-// Router de /api/auth: login con Google (OAuth + PKCE) y logout.
+// Router de /api/auth: login con Google (OAuth + PKCE), recuperación y logout.
 export function createAuthRouter({ env, db, google, now }) {
   const router = Router();
 
@@ -38,6 +44,15 @@ export function createAuthRouter({ env, db, google, now }) {
     name: 'login',
     limit: 10,
     windowMs: MIN,
+    keyFrom: (req) => requestContext(req, env).ipHash,
+  });
+
+  const recoveryLimit = rateLimit({
+    db,
+    now,
+    name: 'recovery-ip',
+    limit: 5,
+    windowMs: HOUR,
     keyFrom: (req) => requestContext(req, env).ipHash,
   });
 
@@ -156,6 +171,45 @@ export function createAuthRouter({ env, db, google, now }) {
       clearFlowCookie(res);
       res.redirect(302, failRedirect);
     }
+  });
+
+  // Acceso con código de recuperación: abre una sesión `recovery` (15 min).
+  // Con el bloqueo global activo no se evalúa el código ni se cuenta el fallo.
+  router.post('/recovery', requireSameOrigin(env), recoveryLimit, async (req, res) => {
+    const parsed = recoveryRequestSchema.safeParse(req.body);
+    if (!parsed.success) throw new HttpError(400, 'invalid_input');
+    const context = requestContext(req, env);
+
+    const lockedUntil = await getLock(db, { key: RECOVERY_LOCK_KEY, now: now() });
+    if (lockedUntil) {
+      await recordAudit(db, { event: 'recovery_locked', ...context, now: now() });
+      const retryAfterMs = lockedUntil.getTime() - now().getTime();
+      res.set('Retry-After', String(Math.max(1, Math.ceil(retryAfterMs / 1000))));
+      throw new HttpError(429, 'rate_limited');
+    }
+
+    // Un formato inválido es un fallo más, pero sin coste de argon2.
+    const code = normalizeCode(parsed.data.code);
+    const valid = code !== '' && (await consumeRecoveryCode(db, { code, now: now() }));
+    if (!valid) {
+      await registerFailure(db, { key: RECOVERY_LOCK_KEY, now: now() });
+      await recordAudit(db, { event: 'recovery_failed', ...context, now: now() });
+      throw new HttpError(401, 'invalid_code');
+    }
+
+    const issuedAt = now();
+    const { token, session } = await db.transaction(async (tx) => {
+      const created = await createSession(tx, {
+        kind: 'recovery',
+        ipHash: context.ipHash,
+        userAgent: context.userAgent,
+        now: issuedAt,
+      });
+      await recordAudit(tx, { event: 'recovery_success', ...context, now: issuedAt });
+      return created;
+    });
+    setSessionCookie(res, token, session.expiresAt.getTime() - issuedAt.getTime());
+    res.json({ ok: true });
   });
 
   router.post(
