@@ -1,6 +1,6 @@
 import { HttpError } from '../lib/errors.js';
 
-const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+export const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
 // En métodos que escriben, el cuerpo (si lo hay) debe ser application/json.
 // Las peticiones sin cuerpo ni Content-Type (p. ej. DELETE, logout) pasan.

@@ -3,6 +3,7 @@ import { requestId } from './middleware/requestId.js';
 import { security } from './middleware/security.js';
 import { jsonOnly } from './middleware/jsonOnly.js';
 import { notFoundHandler, errorHandler } from './middleware/errors.js';
+import { createAdminRouter } from './routes/admin/index.js';
 
 // `testRoutes` es un Router que existe SOLO para tests (se monta antes del
 // 404). `api/index.js` nunca lo pasa.
@@ -27,5 +28,6 @@ export function createApp({ env, db, google, now = () => new Date() }, { testRou
 }
 
 // Los routers de cada módulo se montan aquí.
-// eslint-disable-next-line no-unused-vars
-function mountApiRoutes(app, deps) {}
+function mountApiRoutes(app, deps) {
+  app.use('/api/admin', createAdminRouter(deps));
+}
