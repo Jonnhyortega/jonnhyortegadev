@@ -3,7 +3,13 @@ import request from 'supertest';
 import { Router } from 'express';
 import { createTestDb } from './helpers/db.js';
 import { buildTestApp } from './helpers/app.js';
-import { consume, registerFailure, getLock } from '../../server/services/rateLimit.js';
+import {
+  consume,
+  registerFailure,
+  registerFailureUnlessLocked,
+  getLock,
+  resetFailures,
+} from '../../server/services/rateLimit.js';
 import { rateLimit } from '../../server/middleware/rateLimit.js';
 
 const T0 = new Date('2026-01-01T00:00:00.000Z');
@@ -69,6 +75,57 @@ describe('registerFailure / getLock', () => {
     const later = new Date(T0.getTime() + 24 * 60 * MIN + 1);
     const r = await registerFailure(db, { key: 'rec', now: later });
     expect(r.lockedUntil).toBeNull(); // sería el 10º sin reinicio
+  });
+});
+
+describe('resetFailures', () => {
+  it('pone failures a 0 y quita el bloqueo; registerFailure devuelve el contador', async () => {
+    const db = await createTestDb();
+    let last;
+    for (let i = 0; i < 10; i++) last = await registerFailure(db, { key: 'rec', now: T0 });
+    expect(last.failures).toBe(10);
+    expect(await getLock(db, { key: 'rec', now: T0 })).not.toBeNull();
+
+    await resetFailures(db, { key: 'rec' });
+    expect(await getLock(db, { key: 'rec', now: T0 })).toBeNull();
+    const next = await registerFailure(db, { key: 'rec', now: T0 });
+    expect(next.failures).toBe(1);
+    expect(next.lockedUntil).toBeNull();
+  });
+});
+
+describe('registerFailureUnlessLocked', () => {
+  it('cuenta hasta activar el bloqueo y, con bloqueo activo, no cuenta ni lo alarga', async () => {
+    const db = await createTestDb();
+    let last;
+    for (let i = 0; i < 10; i++) {
+      last = await registerFailureUnlessLocked(db, { key: 'rec', now: T0 });
+      expect(last.locked).toBe(false);
+    }
+    expect(last.failures).toBe(10);
+    const lockedUntil = new Date(T0.getTime() + 15 * MIN);
+    expect(last.lockedUntil).toEqual(lockedUntil);
+
+    const during = new Date(T0.getTime() + 5 * MIN);
+    const blocked = await registerFailureUnlessLocked(db, { key: 'rec', now: during });
+    expect(blocked).toEqual({ locked: true, lockedUntil });
+    expect(await getLock(db, { key: 'rec', now: during })).toEqual(lockedUntil);
+
+    // Expirado el bloqueo vuelve a contar (11º fallo → bloqueo de nuevo).
+    const after = new Date(T0.getTime() + 15 * MIN);
+    const next = await registerFailureUnlessLocked(db, { key: 'rec', now: after });
+    expect(next.locked).toBe(false);
+    expect(next.failures).toBe(11);
+  });
+
+  it('20 llamadas concurrentes cuentan exactamente 10 fallos', async () => {
+    const db = await createTestDb();
+    const results = await Promise.all(
+      Array.from({ length: 20 }, () => registerFailureUnlessLocked(db, { key: 'c', now: T0 })),
+    );
+    expect(results.filter((r) => !r.locked)).toHaveLength(10);
+    const counted = await registerFailure(db, { key: 'c', now: new Date(T0.getTime() + 16 * MIN) });
+    expect(counted.failures).toBe(11);
   });
 });
 

@@ -10,7 +10,7 @@ import { requireCsrf, requireSameOrigin } from '../middleware/csrf.js';
 import { HttpError } from '../lib/errors.js';
 import { recoveryRequestSchema } from '../schemas/auth.js';
 import { recordAudit, requestContext } from '../services/audit.js';
-import { getLock, registerFailure } from '../services/rateLimit.js';
+import { registerFailureUnlessLocked, resetFailures } from '../services/rateLimit.js';
 import { consumeRecoveryCode, normalizeCode } from '../services/recoveryCodes.js';
 import {
   OAUTH_COOKIE,
@@ -180,10 +180,17 @@ export function createAuthRouter({ env, db, google, now }) {
     if (!parsed.success) throw new HttpError(400, 'invalid_input');
     const context = requestContext(req, env);
 
-    const lockedUntil = await getLock(db, { key: RECOVERY_LOCK_KEY, now: now() });
-    if (lockedUntil) {
+    // El fallo se cuenta ANTES de verificar, en la misma sentencia que
+    // comprueba el bloqueo (sin ventana check-then-act entre peticiones
+    // concurrentes). Si ya hay bloqueo: 429, sin evaluar ni contar el fallo.
+    // Si el código resulta válido, el contador se reinicia.
+    const registered = await registerFailureUnlessLocked(db, {
+      key: RECOVERY_LOCK_KEY,
+      now: now(),
+    });
+    if (registered.locked) {
       await recordAudit(db, { event: 'recovery_locked', ...context, now: now() });
-      const retryAfterMs = lockedUntil.getTime() - now().getTime();
+      const retryAfterMs = (registered.lockedUntil?.getTime() ?? 0) - now().getTime();
       res.set('Retry-After', String(Math.max(1, Math.ceil(retryAfterMs / 1000))));
       throw new HttpError(429, 'rate_limited');
     }
@@ -192,11 +199,11 @@ export function createAuthRouter({ env, db, google, now }) {
     const code = normalizeCode(parsed.data.code);
     const valid = code !== '' && (await consumeRecoveryCode(db, { code, now: now() }));
     if (!valid) {
-      await registerFailure(db, { key: RECOVERY_LOCK_KEY, now: now() });
       await recordAudit(db, { event: 'recovery_failed', ...context, now: now() });
       throw new HttpError(401, 'invalid_code');
     }
 
+    await resetFailures(db, { key: RECOVERY_LOCK_KEY });
     const issuedAt = now();
     const { token, session } = await db.transaction(async (tx) => {
       const created = await createSession(tx, {

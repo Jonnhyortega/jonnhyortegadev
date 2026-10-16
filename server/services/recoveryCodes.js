@@ -1,5 +1,5 @@
-import { randomInt } from 'node:crypto';
-import { and, eq, isNull } from 'drizzle-orm';
+import { randomBytes, randomInt } from 'node:crypto';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 import { hash, verify } from '@node-rs/argon2';
 import { recoveryCodes } from '../db/schema.js';
 
@@ -13,6 +13,18 @@ const NORMALIZED = /^[0-9A-HJKMNP-TV-Z]{12}$/;
 // está vacío, así que se usa el valor numérico (Argon2id = 2).
 const ARGON2ID = 2;
 const HASH_OPTIONS = { algorithm: ARGON2ID, memoryCost: 19456, timeCost: 2, parallelism: 1 };
+
+// Clave fija del advisory lock que serializa las regeneraciones.
+// Número (no BigInt) para que cualquier driver lo serialice; se castea a bigint.
+const REGENERATE_LOCK_ID = 7_310_420_001;
+
+// Hash de relleno (mismos parámetros, secreto aleatorio que nunca coincide)
+// para que cada verificación haga siempre CODE_COUNT verify. Se calcula una vez.
+let dummyHashPromise = null;
+function dummyHash() {
+  dummyHashPromise ??= hash(randomBytes(32).toString('hex'), HASH_OPTIONS);
+  return dummyHashPromise;
+}
 
 // Mayúsculas, sin guiones ni espacios, O→0 e I/L→1. '' si el resultado no
 // son 12 caracteres Crockford.
@@ -44,15 +56,18 @@ export async function generateRecoveryCodes(db, now) {
   const hashes = await Promise.all(plain.map((code) => hash(code, HASH_OPTIONS)));
 
   await db.transaction(async (tx) => {
+    // Dos regeneraciones concurrentes no pueden dejar 20 códigos vivos.
+    await tx.execute(sql`select pg_advisory_xact_lock(${REGENERATE_LOCK_ID}::bigint)`);
     await tx.delete(recoveryCodes);
     await tx.insert(recoveryCodes).values(hashes.map((codeHash) => ({ codeHash, createdAt: now })));
   });
   return plain.map(display);
 }
 
-// Verifica contra TODOS los códigos sin usar (trabajo constante sea cual sea
-// el que coincide) y lo marca usado. El UPDATE condicional garantiza que, con
-// peticiones concurrentes, solo una gane.
+// Verifica contra TODOS los códigos sin usar, rellenando con un hash ficticio
+// hasta CODE_COUNT: el trabajo es constante sea cual sea el que coincide y
+// cuántos queden. Después marca el código usado; el UPDATE condicional
+// garantiza que, con peticiones concurrentes, solo una gane.
 export async function consumeRecoveryCode(db, { code, now }) {
   const normalized = normalizeCode(code);
   if (!normalized) return false;
@@ -62,10 +77,16 @@ export async function consumeRecoveryCode(db, { code, now }) {
     .from(recoveryCodes)
     .where(isNull(recoveryCodes.usedAt));
 
+  const candidates = [...unused];
+  if (candidates.length < CODE_COUNT) {
+    const padding = await dummyHash();
+    while (candidates.length < CODE_COUNT) candidates.push({ id: null, codeHash: padding });
+  }
+
   let matchId = null;
-  for (const row of unused) {
+  for (const row of candidates) {
     const matches = await verify(row.codeHash, normalized);
-    if (matches && matchId === null) matchId = row.id;
+    if (matches && matchId === null && row.id !== null) matchId = row.id;
   }
   if (matchId === null) return false;
 

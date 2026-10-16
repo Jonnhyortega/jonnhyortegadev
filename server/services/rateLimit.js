@@ -31,6 +31,21 @@ export async function consume(db, { key, limit, windowMs, now }) {
 // Cuenta un fallo y fija el bloqueo según la escala 10 -> 15 min, 15 -> 1 h, 20 -> 24 h.
 // Los fallos se reinician si pasaron 24 h desde el último.
 export async function registerFailure(db, { key, now }) {
+  const row = await upsertFailure(db, { key, now, onlyIfUnlocked: false });
+  return { failures: row.failures, lockedUntil: row.lockedUntil ?? null };
+}
+
+// Igual que registerFailure, pero en una sola sentencia atómica NO cuenta el
+// fallo si la clave ya está bloqueada: devuelve { locked: true, lockedUntil }.
+// Así, entre peticiones concurrentes, solo las que caben antes del bloqueo
+// llegan a evaluarse.
+export async function registerFailureUnlessLocked(db, { key, now }) {
+  const row = await upsertFailure(db, { key, now, onlyIfUnlocked: true });
+  if (row) return { locked: false, failures: row.failures, lockedUntil: row.lockedUntil ?? null };
+  return { locked: true, lockedUntil: await getLock(db, { key, now }) };
+}
+
+async function upsertFailure(db, { key, now, onlyIfUnlocked }) {
   const nowTs = ts(now);
   const stale = sql`${rateLimits.lastFailureAt} < ${nowTs} - ${ms(DAY_MS)}`;
   const newFailures = sql`(case when ${stale} then 1 else ${rateLimits.failures} + 1 end)`;
@@ -49,9 +64,20 @@ export async function registerFailure(db, { key, now }) {
           else ${rateLimits.lockedUntil}
         end`,
       },
+      setWhere: onlyIfUnlocked
+        ? sql`${rateLimits.lockedUntil} is null or ${rateLimits.lockedUntil} <= ${nowTs}`
+        : undefined,
     })
-    .returning({ lockedUntil: rateLimits.lockedUntil });
-  return { lockedUntil: row.lockedUntil ?? null };
+    .returning({ failures: rateLimits.failures, lockedUntil: rateLimits.lockedUntil });
+  return row;
+}
+
+// Borra en una sola sentencia el contador de fallos y el bloqueo de la clave.
+export async function resetFailures(db, { key }) {
+  await db
+    .update(rateLimits)
+    .set({ failures: 0, lockedUntil: null, lastFailureAt: null })
+    .where(eq(rateLimits.key, key));
 }
 
 export async function getLock(db, { key, now }) {

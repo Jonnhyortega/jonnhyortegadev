@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { verify } from '@node-rs/argon2';
 import request from 'supertest';
 import express from 'express';
 import { eq } from 'drizzle-orm';
@@ -14,6 +15,16 @@ import {
 import { recoveryRequestSchema } from '../../server/schemas/auth.js';
 import { requireSameOrigin } from '../../server/middleware/csrf.js';
 import { notFoundHandler, errorHandler } from '../../server/middleware/errors.js';
+
+// verify real envuelto en un espía para contar las verificaciones argon2.
+vi.mock('@node-rs/argon2', async (importOriginal) => {
+  const actual = await importOriginal();
+  return { ...actual, verify: vi.fn(actual.verify) };
+});
+
+beforeEach(() => {
+  verify.mockClear();
+});
 
 const MIN = 60_000;
 const ORIGIN = 'https://example.test';
@@ -115,6 +126,80 @@ describe('generateRecoveryCodes / consumeRecoveryCode', () => {
     const used = (await db.select().from(recoveryCodes)).filter((r) => r.usedAt !== null);
     expect(used).toHaveLength(1);
     expect(used[0].usedAt.toISOString()).toBe(now.toISOString());
+  });
+});
+
+describe('endurecimiento de generación y verificación', () => {
+  const now = new Date('2026-01-01T00:00:00.000Z');
+
+  it('siempre hace exactamente 10 verify, queden 10 o 3 códigos sin usar', async () => {
+    const db = await createTestDb();
+    const codes = await generateRecoveryCodes(db, now);
+
+    verify.mockClear();
+    expect(await consumeRecoveryCode(db, { code: WRONG_CODE, now })).toBe(false);
+    expect(verify).toHaveBeenCalledTimes(10);
+
+    for (const code of codes.slice(0, 7)) {
+      expect(await consumeRecoveryCode(db, { code, now })).toBe(true);
+    }
+
+    verify.mockClear();
+    expect(await consumeRecoveryCode(db, { code: WRONG_CODE, now })).toBe(false);
+    expect(verify).toHaveBeenCalledTimes(10);
+
+    verify.mockClear();
+    expect(await consumeRecoveryCode(db, { code: codes[9], now })).toBe(true);
+    expect(verify).toHaveBeenCalledTimes(10);
+  });
+
+  it('sin códigos en la BD también hace 10 verify', async () => {
+    const db = await createTestDb();
+    expect(await consumeRecoveryCode(db, { code: WRONG_CODE, now })).toBe(false);
+    expect(verify).toHaveBeenCalledTimes(10);
+  });
+
+  it('dos regeneraciones concurrentes dejan exactamente 10 códigos, todos de un mismo lote', async () => {
+    const db = await createTestDb();
+    const transactionSpy = vi.spyOn(db, 'transaction');
+    const [a, b] = await Promise.all([
+      generateRecoveryCodes(db, now),
+      generateRecoveryCodes(db, now),
+    ]);
+    expect(transactionSpy).toHaveBeenCalledTimes(2);
+
+    const rows = await db.select().from(recoveryCodes);
+    expect(rows).toHaveLength(10);
+    const matchesBatch = async (batch) => {
+      for (const row of rows) {
+        const results = await Promise.all(
+          batch.map((code) => verify(row.codeHash, normalizeCode(code))),
+        );
+        if (!results.includes(true)) return false;
+      }
+      return true;
+    };
+    const fromA = await matchesBatch(a);
+    const fromB = await matchesBatch(b);
+    expect([fromA, fromB].filter(Boolean)).toHaveLength(1);
+  });
+
+  it('la transacción de regeneración toma un advisory lock antes de borrar', async () => {
+    const db = await createTestDb();
+    const statements = [];
+    const realTransaction = db.transaction.bind(db);
+    vi.spyOn(db, 'transaction').mockImplementation((fn, config) =>
+      realTransaction((tx) => {
+        const realExecute = tx.execute.bind(tx);
+        tx.execute = (query) => {
+          statements.push(tx.dialect.sqlToQuery(query).sql);
+          return realExecute(query);
+        };
+        return fn(tx);
+      }, config),
+    );
+    await generateRecoveryCodes(db, now);
+    expect(statements.some((q) => q.includes('pg_advisory_xact_lock'))).toBe(true);
   });
 });
 
@@ -309,5 +394,50 @@ describe('POST /api/auth/recovery', () => {
     const res = await recover(ctx, { code });
     expect(res.status).toBe(404);
     expect(res.body).toEqual({ error: 'not_found' });
+  });
+
+  it('15 intentos inválidos en paralelo: solo 10 se evalúan (401) y el resto 429', async () => {
+    const ctx = await buildTestApp();
+    await generateRecoveryCodes(ctx.db, ctx.clock.now());
+    const results = await Promise.all(
+      Array.from({ length: 15 }, (_, i) =>
+        recover(ctx, { code: WRONG_CODE }, { ip: `198.51.100.${i + 1}` }),
+      ),
+    );
+    const statuses = results.map((r) => r.status);
+    expect(statuses.filter((s) => s === 401)).toHaveLength(10);
+    expect(statuses.filter((s) => s === 429)).toHaveLength(5);
+  });
+
+  it('10 intentos inválidos en paralelo → failures = 10 y luego hasta un código válido da 429', async () => {
+    const ctx = await buildTestApp();
+    const [code] = await generateRecoveryCodes(ctx.db, ctx.clock.now());
+    const results = await Promise.all(
+      Array.from({ length: 10 }, (_, i) =>
+        recover(ctx, { code: WRONG_CODE }, { ip: `198.51.100.${i + 1}` }),
+      ),
+    );
+    expect(results.every((r) => r.status === 401)).toBe(true);
+    expect((await globalLockRow(ctx)).failures).toBe(10);
+
+    const res = await recover(ctx, { code }, { ip: '192.0.2.77' });
+    expect(res.status).toBe(429);
+    const unused = (await ctx.db.select().from(recoveryCodes)).filter((r) => r.usedAt === null);
+    expect(unused).toHaveLength(10);
+  });
+
+  it('un código válido reinicia el contador global de fallos', async () => {
+    const ctx = await buildTestApp();
+    const [code] = await generateRecoveryCodes(ctx.db, ctx.clock.now());
+    for (let i = 0; i < 5; i++) {
+      await recover(ctx, { code: WRONG_CODE }, { ip: `198.51.100.${i + 1}` });
+    }
+    expect((await globalLockRow(ctx)).failures).toBe(5);
+
+    expect((await recover(ctx, { code }, { ip: '192.0.2.88' })).status).toBe(200);
+    const row = await globalLockRow(ctx);
+    expect(row.failures).toBe(0);
+    expect(row.lockedUntil).toBeNull();
+    expect(row.lastFailureAt).toBeNull();
   });
 });
