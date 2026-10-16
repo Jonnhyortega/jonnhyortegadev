@@ -8,6 +8,7 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
+    "preview:headers": "npm run build && node scripts/serve-dist.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "dev:api": "node --watch server/dev.js",
