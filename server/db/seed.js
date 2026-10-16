@@ -43,7 +43,11 @@ async function main() {
   if (!url) {
     throw new Error('Falta la variable DATABASE_URL_MIGRATIONS');
   }
-  const { Pool } = await import('@neondatabase/serverless');
+  const { Pool, neonConfig } = await import('@neondatabase/serverless');
+  // En Node < 22 no hay WebSocket global: se usa `ws` (solo en este CLI).
+  if (globalThis.WebSocket === undefined) {
+    neonConfig.webSocketConstructor = (await import('ws')).default;
+  }
   const { drizzle } = await import('drizzle-orm/neon-serverless');
   const pool = new Pool({ connectionString: url });
   try {
