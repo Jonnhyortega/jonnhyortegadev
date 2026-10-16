@@ -18,7 +18,7 @@ export async function buildTemplateDump() {
   return dump;
 }
 
-// La plantilla la deja lista globalSetup (una sola migraci�n para toda la corrida);
+// La plantilla la deja lista globalSetup (una sola migración para toda la corrida);
 // si falta (p. ej. al ejecutar el archivo fuera de vitest) se construye en el worker.
 let templatePromise;
 
@@ -31,14 +31,23 @@ function getTemplate() {
 
 // Pool acotado de instancias: cada PGlite retiene cientos de MB de memoria WASM que
 // close() no libera, y los tests no las cierran. Se crean como mucho MAX_LIVE por worker
-// (copias independientes de la plantilla) y se reutilizan en rotaci�n, vaciando sus
-// tablas al entregarlas, de modo que cada test recibe una base vac�a y sin estado previo.
-// Dos bases pedidas seguidas son independientes mientras no haya m�s de MAX_LIVE en uso.
-const MAX_LIVE = 3;
+// (copias independientes de la plantilla) y se reutilizan en rotación, vaciando sus
+// tablas al entregarlas, de modo que cada test recibe una base vacía y sin estado previo.
+// Un mismo test no puede pedir más de MAX_LIVE bases (si no, reciclaría una en uso);
+// el contador se reinicia antes de cada test con resetTestDbPool (ver setupFiles).
+export const MAX_LIVE = 3;
 const pool = [];
 let next = 0;
+let requestedInTest = 0;
+
+export function resetTestDbPool() {
+  requestedInTest = 0;
+}
 
 async function resetTables(client) {
+  // Defensa: suelta bloqueos y transacciones que un test anterior haya dejado abiertos.
+  await client.query('SELECT pg_advisory_unlock_all()');
+  await client.exec('ROLLBACK').catch(() => {});
   const { rows } = await client.query(
     "SELECT tablename FROM pg_tables WHERE schemaname = 'public'",
   );
@@ -47,8 +56,14 @@ async function resetTables(client) {
   await client.exec(`TRUNCATE ${names} RESTART IDENTITY CASCADE`);
 }
 
-// Base de datos PGlite en memoria con las migraciones aplicadas y todas las tablas vac�as.
+// Base de datos PGlite en memoria con las migraciones aplicadas y todas las tablas vacías.
 export async function createTestDb() {
+  if (requestedInTest >= MAX_LIVE) {
+    throw new Error(
+      `más de ${MAX_LIVE} bases de test en un mismo test: subí MAX_LIVE en tests/server/helpers/db.js`,
+    );
+  }
+  requestedInTest += 1;
   let client;
   if (pool.length < MAX_LIVE) {
     const template = await getTemplate();

@@ -15,6 +15,7 @@ export default defineConfig({
     hookTimeout: 30000,
     // Tope de workers: cada uno carga PGlite (WASM) y argon2; sin tope se agota la memoria.
     globalSetup: ['tests/server/helpers/globalSetup.js'],
+    setupFiles: ['tests/server/helpers/setup.js'],
     pool: 'forks',
     maxWorkers: 2,
   },

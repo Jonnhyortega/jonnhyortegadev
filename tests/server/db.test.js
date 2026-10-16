@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { eq } from 'drizzle-orm';
-import { createTestDb } from './helpers/db.js';
+import { createTestDb, MAX_LIVE, resetTestDbPool } from './helpers/db.js';
 import { projects, translations, sessions } from '../../server/db/schema.js';
 
 describe('esquema de base de datos', () => {
@@ -65,5 +65,18 @@ describe('aislamiento de createTestDb', () => {
     });
     expect(await a.select().from(projects)).toHaveLength(1);
     expect(await b.select().from(projects)).toHaveLength(0);
+  });
+});
+
+describe('límite de bases de test por test', () => {
+  it('lanza un error claro al pedir más de MAX_LIVE en un mismo test', async () => {
+    for (let i = 0; i < MAX_LIVE; i += 1) await createTestDb();
+    await expect(createTestDb()).rejects.toThrow(/más de \d+ bases de test/);
+  });
+
+  it('resetTestDbPool permite pedir MAX_LIVE bases de nuevo', async () => {
+    for (let i = 0; i < MAX_LIVE; i += 1) await createTestDb();
+    resetTestDbPool();
+    await expect(createTestDb()).resolves.toBeDefined();
   });
 });
