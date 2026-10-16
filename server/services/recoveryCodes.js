@@ -19,12 +19,21 @@ const HASH_OPTIONS = { algorithm: ARGON2ID, memoryCost: 19456, timeCost: 2, para
 const REGENERATE_LOCK_ID = 7_310_420_001;
 
 // Hash de relleno (mismos parámetros, secreto aleatorio que nunca coincide)
-// para que cada verificación haga siempre CODE_COUNT verify. Se calcula una vez.
+// para que cada verificación haga siempre CODE_COUNT verify. Se calcula una vez,
+// al cargar el módulo (la primera verificación no paga su coste aparte). Si el
+// cálculo falla, se olvida la promesa para reintentar en la próxima llamada.
 let dummyHashPromise = null;
 function dummyHash() {
-  dummyHashPromise ??= hash(randomBytes(32).toString('hex'), HASH_OPTIONS);
+  if (!dummyHashPromise) {
+    const pending = hash(randomBytes(32).toString('hex'), HASH_OPTIONS);
+    dummyHashPromise = pending;
+    pending.catch(() => {
+      if (dummyHashPromise === pending) dummyHashPromise = null;
+    });
+  }
   return dummyHashPromise;
 }
+dummyHash();
 
 // Mayúsculas, sin guiones ni espacios, O→0 e I/L→1. '' si el resultado no
 // son 12 caracteres Crockford.

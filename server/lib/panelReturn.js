@@ -1,6 +1,9 @@
 // Firma de la cookie de retorno al panel. Usa Web Crypto para funcionar igual en
 // Node y en el runtime de la middleware de Vercel (sin dependencias de Node).
 const TTL_MS = 120_000;
+// Desfase de reloj tolerado entre la función que firma y la middleware que verifica.
+const CLOCK_SKEW_MS = 5_000;
+const MIN_SECRET_LENGTH = 32;
 const encoder = new TextEncoder();
 
 function toBase64Url(bytes) {
@@ -19,6 +22,9 @@ function fromBase64Url(text) {
   }
 }
 
+// Falla cerrado: sin un secreto de al menos 32 caracteres no se firma ni se verifica.
+const isUsableSecret = (secret) => typeof secret === 'string' && secret.length >= MIN_SECRET_LENGTH;
+
 function importKey(secret, usages) {
   return globalThis.crypto.subtle.importKey(
     'raw',
@@ -31,18 +37,19 @@ function importKey(secret, usages) {
 
 // Valor de la cookie: `${expiresAtMs}.${firma}`.
 export async function signPanelReturn(secret, expiresAtMs) {
+  if (!isUsableSecret(secret)) throw new Error('PANEL_RETURN_SECRET inválido');
   const key = await importKey(secret, ['sign']);
   const sig = await globalThis.crypto.subtle.sign('HMAC', key, encoder.encode(String(expiresAtMs)));
   return `${expiresAtMs}.${toBase64Url(new Uint8Array(sig))}`;
 }
 
 export async function verifyPanelReturn(secret, value, nowMs) {
-  if (typeof secret !== 'string' || secret === '' || typeof value !== 'string') return false;
+  if (!isUsableSecret(secret) || typeof value !== 'string') return false;
   const match = /^(\d{1,15})\.([A-Za-z0-9_-]+)$/.exec(value);
   if (!match) return false;
   const expiresAtMs = Number(match[1]);
-  // Vencida, o con una fecha más lejana de lo que el callback pudo emitir.
-  if (expiresAtMs <= nowMs || expiresAtMs > nowMs + TTL_MS) return false;
+  // Vencida, o con una fecha más lejana de lo que el callback pudo emitir (más el desfase).
+  if (expiresAtMs <= nowMs || expiresAtMs > nowMs + TTL_MS + CLOCK_SKEW_MS) return false;
   const sig = fromBase64Url(match[2]);
   if (!sig) return false;
   const key = await importKey(secret, ['verify']);
