@@ -23,10 +23,11 @@ const publicColumns = {
 };
 
 // Crea una sesión. El token en claro solo vive en la cookie; en la BD se
-// guarda su sha256.
-export async function createSession(db, { kind, ipHash, userAgent, now }) {
-  const lifetime = LIFETIME_MS[kind];
-  if (!lifetime) throw new Error(`Unknown session kind: ${kind}`);
+// guarda su sha256. `lifetimeMs` opcional solo puede acortar la duración.
+export async function createSession(db, { kind, ipHash, userAgent, now, lifetimeMs }) {
+  const maxLifetime = LIFETIME_MS[kind];
+  if (!maxLifetime) throw new Error(`Unknown session kind: ${kind}`);
+  const lifetime = lifetimeMs === undefined ? maxLifetime : Math.min(lifetimeMs, maxLifetime);
 
   const token = randomToken();
   const csrfToken = randomToken();

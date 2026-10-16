@@ -2,6 +2,7 @@ import { loadEnv } from './config/env.js';
 import { createDb } from './db/client.js';
 import { createApp } from './app.js';
 import { createSession, SESSION_COOKIE } from './services/sessions.js';
+import { assertDevFakeSessionAllowed } from './config/devSession.js';
 
 // Carga .env local si existe (Node >= 20.12).
 try {
@@ -12,15 +13,22 @@ try {
 
 // DEV_FAKE_SESSION=1: el panel funciona en local sin OAuth. Se trata el
 // entorno como producción en este proceso y se imprime una cookie de sesión
-// `full`. Nunca en Vercel ni con NODE_ENV=production.
+// `full` de 2 h, creada SOLO en DEV_DATABASE_URL (nunca en DATABASE_URL).
 const fakeSession = process.env.DEV_FAKE_SESSION === '1';
-if (fakeSession && (process.env.VERCEL_ENV || process.env.NODE_ENV === 'production')) {
-  console.error('DEV_FAKE_SESSION no se permite con VERCEL_ENV definido ni con NODE_ENV=production.');
-  process.exit(1);
+let devDatabaseUrl = null;
+if (fakeSession) {
+  try {
+    devDatabaseUrl = assertDevFakeSessionAllowed(process.env);
+  } catch (err) {
+    console.error(err.message);
+    process.exit(1);
+  }
 }
 
 const loadedEnv = loadEnv();
-const env = fakeSession ? { ...loadedEnv, isProduction: true } : loadedEnv;
+const env = fakeSession
+  ? { ...loadedEnv, databaseUrl: devDatabaseUrl, isProduction: true }
+  : loadedEnv;
 const db = createDb(env.databaseUrl);
 
 // Stub hasta que exista el cliente real de Google (Task 9).
@@ -44,8 +52,12 @@ if (fakeSession) {
     ipHash: null,
     userAgent: 'dev-fake-session',
     now: new Date(),
+    lifetimeMs: 2 * 60 * 60 * 1000,
   });
-  console.log(`Sesión de desarrollo (cookie): ${SESSION_COOKIE}=${token}`);
+  console.log(
+    'Sesión de desarrollo en DEV_DATABASE_URL: dura 2 h y caduca tras 30 min sin actividad.',
+  );
+  console.log(`Cookie: ${SESSION_COOKIE}=${token}`);
 }
 
 const port = 3001;

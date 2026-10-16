@@ -21,6 +21,7 @@ import { loadSession, requireSession } from '../../server/middleware/session.js'
 import { requireCsrf } from '../../server/middleware/csrf.js';
 import { productionOnly } from '../../server/middleware/productionOnly.js';
 import { errorHandler, notFoundHandler } from '../../server/middleware/errors.js';
+import { createAdminRouter } from '../../server/routes/admin/index.js';
 
 const MIN = 60_000;
 const HOUR = 60 * MIN;
@@ -151,6 +152,14 @@ describe('servicio de sesiones', () => {
     const db = await createTestDb();
     const { session } = await createSession(db, { kind: 'recovery', now: T0 });
     expect(session.expiresAt).toEqual(new Date(T0.getTime() + 15 * MIN));
+  });
+
+  it('lifetimeMs acorta la duración absoluta, nunca la alarga', async () => {
+    const db = await createTestDb();
+    const short = await createSession(db, { kind: 'full', now: T0, lifetimeMs: 2 * HOUR });
+    expect(short.session.expiresAt).toEqual(new Date(T0.getTime() + 2 * HOUR));
+    const long = await createSession(db, { kind: 'full', now: T0, lifetimeMs: 24 * HOUR });
+    expect(long.session.expiresAt).toEqual(new Date(T0.getTime() + 8 * HOUR));
   });
 
   it('rechaza tipos desconocidos', async () => {
@@ -436,7 +445,7 @@ describe('router admin: CSRF y límite de escrituras', () => {
   it('POST sin sesión → 404 (no revela la existencia del router)', async () => {
     const ctx = await buildTestApp();
     const res = await request(ctx.app).post('/api/admin/prueba').set('Origin', ORIGIN);
-    expect(res.status).toBe(404);
+    expectSame404(res, await genericNotFound(ctx.app));
   });
 
   it('60 escrituras por minuto por sesión; la 61ª → 429; las lecturas no cuentan', async () => {
@@ -465,5 +474,38 @@ describe('router admin: CSRF y límite de escrituras', () => {
       .set('Origin', ORIGIN)
       .set('X-CSRF-Token', other.csrf);
     expect(res.status).toBe(404);
+  });
+});
+
+describe('router admin: solo full por defecto', () => {
+  // Compone el router real y le añade una ruta después de su creación: queda
+  // detrás de la puerta requireSession('full'), como cualquier subrouter futuro.
+  async function composedApp() {
+    const db = await createTestDb();
+    const clock = { now: () => new Date('2026-01-01T00:00:00.000Z') };
+    const env = { appOrigin: ORIGIN, isProduction: true };
+    const admin = createAdminRouter({ env, db, now: clock.now });
+    admin.get('/sonda', (req, res) => res.json({ ok: true }));
+    const app = express();
+    app.use('/api/admin', admin);
+    app.use(notFoundHandler);
+    app.use(errorHandler);
+    return { app, db, clock };
+  }
+
+  it('recovery recibe el 404 genérico en rutas posteriores a la puerta; full accede', async () => {
+    const ctx = await composedApp();
+    const recovery = await loginAs(ctx, 'recovery');
+    const full = await loginAs(ctx, 'full');
+
+    const denied = await request(ctx.app).get('/api/admin/sonda').set('Cookie', recovery.cookie);
+    expectSame404(denied, await request(ctx.app).get('/api/no-existe'));
+
+    const allowed = await request(ctx.app).get('/api/admin/sonda').set('Cookie', full.cookie);
+    expect(allowed.status).toBe(200);
+
+    // /me sigue accesible para recovery (está antes de la puerta).
+    const me = await request(ctx.app).get('/api/admin/me').set('Cookie', recovery.cookie);
+    expect(me.status).toBe(200);
   });
 });
