@@ -4,6 +4,7 @@ import { createGoogleClient } from './services/google.js';
 import { createApp } from './app.js';
 import { createSession, SESSION_COOKIE } from './services/sessions.js';
 import { assertDevFakeSessionAllowed } from './config/devSession.js';
+import { createDevPgliteDb, isPgliteMemoryUrl } from './db/devPglite.js';
 
 // Carga .env local si existe (Node >= 20.12).
 try {
@@ -30,7 +31,11 @@ const loadedEnv = loadEnv();
 const env = fakeSession
   ? { ...loadedEnv, databaseUrl: devDatabaseUrl, isProduction: true }
   : loadedEnv;
-const db = createDb(env.databaseUrl);
+// DEV_DATABASE_URL=pglite:memory usa una BD efímera en memoria (migrada y sembrada).
+const db =
+  fakeSession && isPgliteMemoryUrl(devDatabaseUrl)
+    ? await createDevPgliteDb()
+    : createDb(env.databaseUrl);
 
 const google = createGoogleClient(env);
 

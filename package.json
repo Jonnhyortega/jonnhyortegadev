@@ -11,6 +11,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "dev:api": "node --watch server/dev.js",
+    "dev:panel": "node scripts/dev-panel.mjs",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "node server/db/migrate.js",
     "db:seed": "node server/db/seed.js"
