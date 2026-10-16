@@ -10,6 +10,7 @@ const schema = z.object({
   ADMIN_EMAIL: z.string().trim().email().toLowerCase(),
   APP_ORIGIN: z.string().url(),
   IP_HASH_SECRET: z.string().min(32),
+  PANEL_RETURN_SECRET: z.string().min(32),
   VERCEL_ENV: z.enum(['production', 'preview', 'development']).default('development'),
 });
 
@@ -41,6 +42,7 @@ export function loadEnv(source = process.env) {
     adminEmail: data.ADMIN_EMAIL,
     appOrigin: data.APP_ORIGIN,
     ipHashSecret: data.IP_HASH_SECRET,
+    panelReturnSecret: data.PANEL_RETURN_SECRET,
     vercelEnv: data.VERCEL_ENV,
     isProduction,
   };

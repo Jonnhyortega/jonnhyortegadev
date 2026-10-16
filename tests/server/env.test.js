@@ -11,6 +11,7 @@ const validSource = (overrides = {}) => ({
   ADMIN_EMAIL: 'Admin@Example.com',
   APP_ORIGIN: 'https://example.com',
   IP_HASH_SECRET: SECRET,
+  PANEL_RETURN_SECRET: SECRET,
   VERCEL_ENV: 'production',
   ...overrides,
 });
@@ -26,6 +27,7 @@ describe('loadEnv', () => {
       adminEmail: 'admin@example.com',
       appOrigin: 'https://example.com',
       ipHashSecret: SECRET,
+      panelReturnSecret: SECRET,
       vercelEnv: 'production',
       isProduction: true,
     });
@@ -61,6 +63,13 @@ describe('loadEnv', () => {
       }),
     );
     expect(env.isProduction).toBe(false);
+  });
+
+  it('rechaza PANEL_RETURN_SECRET ausente o corto', () => {
+    const source = validSource();
+    delete source.PANEL_RETURN_SECRET;
+    expect(() => loadEnv(source)).toThrow(/PANEL_RETURN_SECRET/);
+    expect(() => loadEnv(validSource({ PANEL_RETURN_SECRET: 'corto' }))).toThrow(/PANEL_RETURN_SECRET/);
   });
 
   it('rechaza IP_HASH_SECRET de menos de 32 caracteres', () => {

@@ -1,5 +1,6 @@
 // Routing Middleware de Vercel: sirve el panel de administración solo por la ruta secreta.
 import { rewrite } from '@vercel/functions';
+import { verifyPanelReturn } from './server/lib/panelReturn.js';
 
 export const config = { matcher: ['/((?!assets/|api/).*)'] };
 
@@ -15,12 +16,16 @@ function normalizePath(pathname) {
   }
 }
 
-function hasCookie(request, name) {
+function readCookie(request, name) {
   const header = request.headers.get('cookie') ?? '';
-  return header.split(';').some((part) => part.trim().startsWith(`${name}=`));
+  for (const part of header.split(';')) {
+    const trimmed = part.trim();
+    if (trimmed.startsWith(`${name}=`)) return trimmed.slice(name.length + 1);
+  }
+  return null;
 }
 
-export function handle(request, env) {
+export async function handle(request, env) {
   const url = new URL(request.url);
 
   // El archivo del panel nunca se sirve por su nombre real, ni con variantes de escritura.
@@ -43,8 +48,15 @@ export function handle(request, env) {
   }
 
   // Destino neutro del callback de OAuth. Solo revela la ruta del panel a quien trae la
-  // cookie de un solo uso que fija el callback; sin ella la ruta no existe.
-  if (url.pathname === '/__panel-return' && hasCookie(request, PANEL_RETURN_COOKIE)) {
+  // cookie firmada que fija el callback; sin ella la ruta no existe.
+  if (
+    url.pathname === '/__panel-return' &&
+    (await verifyPanelReturn(
+      env.PANEL_RETURN_SECRET,
+      readCookie(request, PANEL_RETURN_COOKIE),
+      Date.now(),
+    ))
+  ) {
     const target = new URL(env.ADMIN_PATH, request.url);
     if (url.searchParams.get('error') === '1') target.searchParams.set('error', '1');
     return new Response(null, {
@@ -60,6 +72,6 @@ export function handle(request, env) {
   return undefined;
 }
 
-export default function middleware(request) {
+export default async function middleware(request) {
   return handle(request, process.env);
 }

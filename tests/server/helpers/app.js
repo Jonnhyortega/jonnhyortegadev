@@ -70,6 +70,7 @@ export async function buildTestApp({ env: envOverrides, testRoutes, ...depOverri
     adminEmail: 'jonnhyortega@gmail.com',
     appOrigin: 'https://example.test',
     ipHashSecret: 'test-ip-hash-secret-0123456789abcdef',
+    panelReturnSecret: 'test-panel-return-secret-0123456789abcdef',
     vercelEnv: 'production',
     isProduction: true,
     ...envOverrides,

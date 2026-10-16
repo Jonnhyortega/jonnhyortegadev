@@ -2,11 +2,12 @@ import { Router } from 'express';
 import { parse, serialize } from 'cookie';
 import { asc, eq, sql } from 'drizzle-orm';
 import { adminIdentity } from '../db/schema.js';
-import { randomToken, safeEqual, sha256 } from '../lib/crypto.js';
+import { safeEqual, sha256 } from '../lib/crypto.js';
 import { productionOnly } from '../middleware/productionOnly.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 import { loadSession, requireSession } from '../middleware/session.js';
 import { requireCsrf, requireSameOrigin } from '../middleware/csrf.js';
+import { PANEL_RETURN_TTL_MS, signPanelReturn } from '../lib/panelReturn.js';
 import { HttpError } from '../lib/errors.js';
 import { recoveryRequestSchema } from '../schemas/auth.js';
 import { recordAudit, requestContext } from '../services/audit.js';
@@ -33,27 +34,29 @@ const HOUR = 60 * MIN;
 const RECOVERY_LOCK_KEY = 'recovery:global';
 // La middleware (Task 15) convierte esta ruta en un 302 hacia el panel.
 const PANEL_RETURN = '/__panel-return';
-// Cookie de un solo uso: la middleware solo revela la ruta del panel a quien
+// Cookie firmada y de vida corta (R29/R31): la middleware solo revela la ruta a quien
 // viene de un callback (R29). Sin ella, /__panel-return no existe.
 const PANEL_RETURN_COOKIE = '__Host-panel-return';
-
-function redirectToPanel(res, location) {
-  res.append(
-    'Set-Cookie',
-    serialize(PANEL_RETURN_COOKIE, randomToken(16), {
-      httpOnly: true,
-      secure: true,
-      sameSite: 'lax',
-      path: '/',
-      maxAge: 120,
-    }),
-  );
-  res.redirect(302, location);
-}
 
 // Router de /api/auth: login con Google (OAuth + PKCE), recuperación y logout.
 export function createAuthRouter({ env, db, google, now }) {
   const router = Router();
+
+  // El valor va firmado (HMAC): la middleware solo acepta cookies que emitió este callback.
+  async function redirectToPanel(res, location) {
+    const expiresAtMs = now().getTime() + PANEL_RETURN_TTL_MS;
+    res.append(
+      'Set-Cookie',
+      serialize(PANEL_RETURN_COOKIE, await signPanelReturn(env.panelReturnSecret, expiresAtMs), {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'lax',
+        path: '/',
+        maxAge: PANEL_RETURN_TTL_MS / 1000,
+      }),
+    );
+    res.redirect(302, location);
+  }
 
   const loginLimit = rateLimit({
     db,
@@ -165,10 +168,10 @@ export function createAuthRouter({ env, db, google, now }) {
           meta: { reason: result.reason },
           now: now(),
         });
-        return redirectToPanel(res, failRedirect);
+        return await redirectToPanel(res, failRedirect);
       }
       setSessionCookie(res, result.token, result.maxAgeMs);
-      return redirectToPanel(res, PANEL_RETURN);
+      return await redirectToPanel(res, PANEL_RETURN);
     } catch (err) {
       // Error inesperado (BD, etc.): solo se registra id de petición y stack.
       console.error(`[${req.id}]`, err?.stack ?? String(err));
@@ -186,7 +189,7 @@ export function createAuthRouter({ env, db, google, now }) {
       // Por si acaso: ninguna cookie de sesión sale en una respuesta de error.
       res.removeHeader('Set-Cookie');
       clearFlowCookie(res);
-      redirectToPanel(res, failRedirect);
+      await redirectToPanel(res, failRedirect);
     }
   });
 

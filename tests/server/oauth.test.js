@@ -7,6 +7,7 @@ import { loginAs } from './helpers/auth.js';
 import { adminIdentity, auditLog, oauthFlows, sessions } from '../../server/db/schema.js';
 import { SESSION_COOKIE } from '../../server/services/sessions.js';
 import { sha256 } from '../../server/lib/crypto.js';
+import { verifyPanelReturn } from '../../server/lib/panelReturn.js';
 
 const MIN = 60_000;
 const ORIGIN = 'https://example.test';
@@ -71,16 +72,19 @@ function expectOauthCookieCleared(res) {
   expect(cleared).toMatch(/Path=\//);
 }
 
-function expectPanelReturnCookie(res) {
+async function expectPanelReturnCookie(res, ctx) {
   const cookie = findCookie(res, '__Host-panel-return');
   expect(cookie).toBeDefined();
-  expect(cookie).toMatch(/^__Host-panel-return=[A-Za-z0-9_-]{22};/);
+  expect(cookie).toMatch(/^__Host-panel-return=\d+\.[A-Za-z0-9_-]{43};/);
   expect(cookie).toMatch(/HttpOnly/);
   expect(cookie).toMatch(/Secure/);
   expect(cookie).toMatch(/SameSite=Lax/);
   expect(cookie).toMatch(/Path=\//);
   expect(cookie).toMatch(/Max-Age=120/);
   expect(cookie).not.toMatch(/Domain=/i);
+  const value = cookie.split(';')[0].slice('__Host-panel-return='.length);
+  expect(await verifyPanelReturn(ctx.env.panelReturnSecret, value, ctx.clock.now().getTime())).toBe(true);
+  expect(await verifyPanelReturn('otro-secreto-otro-secreto-otro-secreto-12', value, ctx.clock.now().getTime())).toBe(false);
 }
 
 async function expectRejected(ctx, res, reason) {
@@ -88,7 +92,7 @@ async function expectRejected(ctx, res, reason) {
   expect(res.headers.location).toBe('/__panel-return?error=1');
   expect(sessionCookie(res)).toBeUndefined();
   expectOauthCookieCleared(res);
-  expectPanelReturnCookie(res);
+  await expectPanelReturnCookie(res, ctx);
   // Todos los eventos del test comparten la hora del reloj falso: se compara
   // el conjunto de motivos de rechazo, no el orden.
   const reasons = (await auditEvents(ctx))
@@ -173,7 +177,7 @@ describe('GET /api/auth/google/callback', () => {
     expect(cookie).toMatch(/Path=\//);
     expect(cookie).toMatch(/Max-Age=28800/);
     expectOauthCookieCleared(res);
-    expectPanelReturnCookie(res);
+    await expectPanelReturnCookie(res, ctx);
 
     // El code_verifier del flujo es el que se usa en el intercambio.
     expect(ctx.google.exchanges).toHaveLength(1);
@@ -394,7 +398,7 @@ describe('GET /api/auth/google/callback', () => {
     const res = await callback(ctx, { code: 'auth-code', state }, [bindingCookie]);
     expect(res.status).toBe(302);
     expect(res.headers.location).toBe('/__panel-return?error=1');
-    expectPanelReturnCookie(res);
+    await expectPanelReturnCookie(res, ctx);
     expect(sessionCookie(res)).toBeUndefined();
     expectOauthCookieCleared(res);
   });
