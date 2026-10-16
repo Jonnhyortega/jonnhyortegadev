@@ -198,11 +198,13 @@ describe('oauthFlows', () => {
     expect(flow.state).toMatch(/^[A-Za-z0-9_-]{43}$/);
     expect(flow.codeVerifier).toMatch(/^[A-Za-z0-9_-]{43}$/);
     expect(flow.nonce).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(flow.binding).toMatch(/^[A-Za-z0-9_-]{43}$/);
     expect(flow.codeChallenge).toBe(createHash('sha256').update(flow.codeVerifier).digest('base64url'));
 
     const rows = await db.select().from(oauthFlows);
     expect(rows).toHaveLength(1);
     expect(rows[0].stateHash).toBe(sha256(flow.state));
+    expect(rows[0].bindingHash).toBe(sha256(flow.binding));
     expect(rows[0].expiresAt.getTime()).toBe(now.getTime() + 5 * MIN);
   });
 
@@ -212,6 +214,7 @@ describe('oauthFlows', () => {
     await expect(takeFlow(db, { state: flow.state, now })).resolves.toEqual({
       codeVerifier: flow.codeVerifier,
       nonce: flow.nonce,
+      bindingHash: sha256(flow.binding),
     });
     await expect(takeFlow(db, { state: flow.state, now })).resolves.toBeNull();
     expect(await db.select().from(oauthFlows)).toHaveLength(0);

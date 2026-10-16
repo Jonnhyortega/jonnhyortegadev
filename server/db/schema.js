@@ -46,6 +46,8 @@ export const oauthFlows = pgTable('oauth_flows', {
   stateHash: text('state_hash').primaryKey(),
   codeVerifier: text('code_verifier').notNull(),
   nonce: text('nonce').notNull(),
+  // sha256 del valor de la cookie __Host-oauth: liga el flujo al navegador.
+  bindingHash: text('binding_hash').notNull(),
   expiresAt: tz('expires_at').notNull(),
 });
 

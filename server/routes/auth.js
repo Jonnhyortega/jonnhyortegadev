@@ -1,17 +1,26 @@
 import { Router } from 'express';
+import { parse } from 'cookie';
 import { asc, eq, sql } from 'drizzle-orm';
 import { adminIdentity } from '../db/schema.js';
-import { safeEqual } from '../lib/crypto.js';
+import { safeEqual, sha256 } from '../lib/crypto.js';
 import { productionOnly } from '../middleware/productionOnly.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 import { loadSession, requireSession } from '../middleware/session.js';
 import { requireCsrf } from '../middleware/csrf.js';
 import { recordAudit, requestContext } from '../services/audit.js';
-import { createFlow, takeFlow } from '../services/oauthFlows.js';
 import {
+  OAUTH_COOKIE,
+  clearFlowCookie,
+  createFlow,
+  setFlowCookie,
+  takeFlow,
+} from '../services/oauthFlows.js';
+import {
+  SESSION_COOKIE,
   clearSessionCookie,
   createSession,
   deleteSession,
+  getSession,
   setSessionCookie,
 } from '../services/sessions.js';
 
@@ -40,6 +49,7 @@ export function createAuthRouter({ env, db, google, now }) {
 
   router.get('/google/start', loginLimit, async (req, res) => {
     const flow = await createFlow(db, now());
+    setFlowCookie(res, flow.binding);
     res.redirect(
       302,
       google.buildAuthUrl({
@@ -50,54 +60,102 @@ export function createAuthRouter({ env, db, google, now }) {
     );
   });
 
-  router.get('/google/callback', loginLimit, loadSession({ db, now }), async (req, res) => {
-    const context = requestContext(req, env);
-    // Nunca se repite el texto de error de Google ni se guardan code/tokens.
-    const reject = async (reason) => {
-      await recordAudit(db, { event: 'login_rejected', ...context, meta: { reason }, now: now() });
-      res.redirect(302, `${PANEL_RETURN}?error=1`);
-    };
-
+  // Valida el callback en orden. Devuelve el motivo de rechazo, o
+  // { token, maxAgeMs } de la sesión nueva si todo es correcto.
+  async function completeLogin(req, context) {
+    const cookies = parse(req.headers.cookie ?? '');
     const { code, state } = req.query;
-    const flow = await takeFlow(db, { state, now: now() });
-    if (!flow) return reject('invalid_state');
 
-    if (typeof code !== 'string' || code.length === 0) return reject('exchange_failed');
+    // El flujo se consume siempre, aunque luego falle el binding.
+    const flow = await takeFlow(db, { state, now: now() });
+    if (!flow) return { reason: 'invalid_state' };
+    const binding = cookies[OAUTH_COOKIE];
+    if (typeof binding !== 'string' || !safeEqual(sha256(binding), flow.bindingHash)) {
+      return { reason: 'invalid_state' };
+    }
+
+    if (typeof code !== 'string' || code.length === 0) return { reason: 'exchange_failed' };
     let idToken;
     try {
       ({ idToken } = await google.exchangeCode({ code, codeVerifier: flow.codeVerifier }));
     } catch {
-      return reject('exchange_failed');
+      return { reason: 'exchange_failed' };
     }
 
     let identity;
     try {
       identity = await google.verifyIdToken(idToken, { nonce: flow.nonce });
     } catch {
-      return reject('invalid_token');
+      return { reason: 'invalid_token' };
     }
 
     if (typeof identity.email !== 'string' || identity.email.toLowerCase() !== env.adminEmail) {
-      return reject('email_not_allowed');
+      return { reason: 'email_not_allowed' };
     }
-    if (identity.emailVerified !== true) return reject('email_not_verified');
+    if (identity.emailVerified !== true) return { reason: 'email_not_verified' };
     if (!(await bindAdminIdentity(db, { email: env.adminEmail, sub: identity.sub }))) {
-      return reject('sub_mismatch');
+      return { reason: 'sub_mismatch' };
     }
 
     // Contra fijación de sesión: la sesión previa (si la hay) se descarta y
-    // siempre se emite un token nuevo.
-    if (req.session) await deleteSession(db, req.session.id);
+    // siempre se emite un token nuevo. Sesión y auditoría van en una sola
+    // transacción: sin login_success registrado no hay sesión ni cookie.
+    const previousToken = cookies[SESSION_COOKIE];
+    const previous = previousToken ? await getSession(db, { token: previousToken, now: now() }) : null;
     const issuedAt = now();
-    const { token, session } = await createSession(db, {
-      kind: 'full',
-      ipHash: context.ipHash,
-      userAgent: context.userAgent,
-      now: issuedAt,
+    const { token, session } = await db.transaction(async (tx) => {
+      if (previous) await deleteSession(tx, previous.id);
+      const created = await createSession(tx, {
+        kind: 'full',
+        ipHash: context.ipHash,
+        userAgent: context.userAgent,
+        now: issuedAt,
+      });
+      await recordAudit(tx, { event: 'login_success', ...context, now: issuedAt });
+      return created;
     });
-    setSessionCookie(res, token, session.expiresAt.getTime() - issuedAt.getTime());
-    await recordAudit(db, { event: 'login_success', ...context, now: issuedAt });
-    res.redirect(302, PANEL_RETURN);
+    return { token, maxAgeMs: session.expiresAt.getTime() - issuedAt.getTime() };
+  }
+
+  router.get('/google/callback', loginLimit, async (req, res) => {
+    const context = requestContext(req, env);
+    const failRedirect = `${PANEL_RETURN}?error=1`;
+    // La cookie de binding se borra siempre, con éxito o con error.
+    clearFlowCookie(res);
+
+    try {
+      const result = await completeLogin(req, context);
+      if (result.reason) {
+        // Nunca se repite el texto de error de Google ni se guardan code/tokens.
+        await recordAudit(db, {
+          event: 'login_rejected',
+          ...context,
+          meta: { reason: result.reason },
+          now: now(),
+        });
+        return res.redirect(302, failRedirect);
+      }
+      setSessionCookie(res, result.token, result.maxAgeMs);
+      return res.redirect(302, PANEL_RETURN);
+    } catch (err) {
+      // Error inesperado (BD, etc.): solo se registra id de petición y stack.
+      console.error(`[${req.id}]`, err?.stack ?? String(err));
+      try {
+        await recordAudit(db, {
+          event: 'login_rejected',
+          ...context,
+          meta: { reason: 'internal_error' },
+          now: now(),
+        });
+      } catch {
+        // auditoría de mejor esfuerzo
+      }
+      if (res.headersSent) return;
+      // Por si acaso: ninguna cookie de sesión sale en una respuesta de error.
+      res.removeHeader('Set-Cookie');
+      clearFlowCookie(res);
+      res.redirect(302, failRedirect);
+    }
   });
 
   router.post(
