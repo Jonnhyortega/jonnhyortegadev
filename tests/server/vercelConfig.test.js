@@ -40,15 +40,17 @@ describe('vercel.json', () => {
     expect(config.rewrites.some((r) => r.destination === '/index.html')).toBe(false);
   });
 
-  describe('headers de seguridad globales', () => {
-    const headers = headersFor('/(.*)');
+  describe('headers de seguridad', () => {
+    it('en todas las rutas (también /api) solo se fija HSTS', () => {
+      expect(headersFor('/(.*)')).toEqual({
+        'Strict-Transport-Security': 'max-age=63072000; includeSubDomains; preload',
+      });
+    });
 
-    it('define los headers fijos', () => {
-      expect(headers['Strict-Transport-Security']).toBe(
-        'max-age=63072000; includeSubDomains; preload',
-      );
+    it('el sitio estático (fuera de /api) define los headers fijos', () => {
+      const headers = headersFor('/((?!api/).*)');
       expect(headers['X-Content-Type-Options']).toBe('nosniff');
-      expect(headers['Referrer-Policy']).toBeTruthy();
+      expect(headers['Referrer-Policy']).toBe('strict-origin-when-cross-origin');
       expect(headers['Permissions-Policy']).toBe(
         'camera=(), microphone=(), geolocation=(), payment=(), usb=()',
       );
@@ -56,41 +58,46 @@ describe('vercel.json', () => {
       expect(headers['X-Frame-Options']).toBe('DENY');
     });
 
-    it('no envía una CSP que choque con la de la API', () => {
-      expect(headers['Content-Security-Policy']).toBeUndefined();
+    it('ningún bloque que alcance /api fija otra cosa que HSTS (la API usa helmet)', () => {
+      const reachesApi = config.headers.filter((h) => !['/((?!api/).*)', '/assets/(.*)'].includes(h.source));
+      for (const block of reachesApi) {
+        expect(block.headers.map((h) => h.key)).toEqual(['Strict-Transport-Security']);
+      }
     });
   });
 
   describe('CSP del sitio estático', () => {
-    const source = '/((?!api/).*)';
-    const csp = headersFor(source)['Content-Security-Policy'];
-    const directives = cspDirectives(csp ?? '');
+    const cspFor = () => headersFor('/((?!api/).*)')['Content-Security-Policy'];
+    const directives = () => cspDirectives(cspFor() ?? '');
 
     it('existe y excluye /api', () => {
-      expect(csp).toBeTruthy();
+      expect(cspFor()).toBeTruthy();
     });
 
     it('script-src es estricta', () => {
-      const scriptSrc = directives['script-src'];
+      const scriptSrc = directives()['script-src'];
       expect(scriptSrc).toContain("'self'");
       expect(scriptSrc).toContain('https://www.googletagmanager.com');
       expect(scriptSrc).not.toContain("'unsafe-eval'");
       expect(scriptSrc).not.toContain("'unsafe-inline'");
-      expect(csp).not.toContain("'unsafe-eval'");
+      expect(cspFor()).not.toContain("'unsafe-eval'");
     });
 
-    it('contiene frame-ancestors none y default-src self', () => {
-      expect(directives['frame-ancestors']).toEqual(["'none'"]);
-      expect(directives['default-src']).toEqual(["'self'"]);
+    it('contiene frame-ancestors none, default-src self y upgrade-insecure-requests', () => {
+      const d = directives();
+      expect(d['frame-ancestors']).toEqual(["'none'"]);
+      expect(d['default-src']).toEqual(["'self'"]);
+      expect(d['upgrade-insecure-requests']).toEqual([]);
     });
 
     it('el hash sha256 coincide con el script inline de gtag en index.html', () => {
       const hash = createHash('sha256').update(inlineGtagScript()).digest('base64');
-      expect(directives['script-src']).toContain(`'sha256-${hash}'`);
+      expect(directives()['script-src']).toContain(`'sha256-${hash}'`);
     });
 
     it('permite los orígenes necesarios', () => {
-      expect(directives['connect-src']).toEqual(
+      const d = directives();
+      expect(d['connect-src']).toEqual(
         expect.arrayContaining([
           "'self'",
           'https://2j5uuy7hcg.execute-api.us-east-1.amazonaws.com',
@@ -99,7 +106,7 @@ describe('vercel.json', () => {
           'https://www.googletagmanager.com',
         ]),
       );
-      expect(directives['img-src']).toEqual(
+      expect(d['img-src']).toEqual(
         expect.arrayContaining([
           "'self'",
           'data:',
@@ -110,11 +117,11 @@ describe('vercel.json', () => {
           'https://www.googletagmanager.com',
         ]),
       );
-      expect(directives['form-action']).toEqual(["'self'", 'https://accounts.google.com']);
-      expect(directives['media-src']).toEqual(["'self'"]);
-      expect(directives['worker-src']).toEqual(["'self'", 'blob:']);
-      expect(directives['font-src']).toContain('https://fonts.gstatic.com');
-      expect(directives['style-src']).toContain('https://fonts.googleapis.com');
+      expect(d['form-action']).toEqual(["'self'", 'https://accounts.google.com']);
+      expect(d['media-src']).toEqual(["'self'"]);
+      expect(d['worker-src']).toEqual(["'self'", 'blob:']);
+      expect(d['font-src']).toContain('https://fonts.gstatic.com');
+      expect(d['style-src']).toContain('https://fonts.googleapis.com');
     });
   });
 
