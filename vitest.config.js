@@ -13,11 +13,11 @@ export default defineConfig({
     // Cada test del servidor levanta un PGlite en memoria; en paralelo tarda más de 5 s.
     testTimeout: 30000,
     hookTimeout: 30000,
-    // Tope de workers: cada uno carga PGlite (WASM) y argon2; sin tope se agota la memoria.
     globalSetup: ['tests/server/helpers/globalSetup.js'],
     setupFiles: ['tests/server/helpers/setup.js'],
     pool: 'forks',
-    // En CI (poca memoria) un solo worker evita "Worker exited unexpectedly".
-    maxWorkers: process.env.CI ? 1 : 2,
+    // Un solo worker en todos los entornos (R36): cada uno carga PGlite (WASM) y argon2,
+    // y con más de uno se agota la memoria ("Worker exited unexpectedly").
+    maxWorkers: 1,
   },
 });
