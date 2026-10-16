@@ -3,8 +3,10 @@ import request from 'supertest';
 import { Router } from 'express';
 import { createTestDb } from './helpers/db.js';
 import { buildTestApp } from './helpers/app.js';
+import { rateLimits } from '../../server/db/schema.js';
 import {
   consume,
+  purgeStaleRateLimits,
   registerFailure,
   registerFailureUnlessLocked,
   getLock,
@@ -159,5 +161,56 @@ describe('middleware rateLimit', () => {
 
     clock.advance(MIN);
     expect((await request(app).post('/api/test-limited').send({})).status).toBe(200);
+  });
+});
+
+describe('limpieza de rate_limits', () => {
+  const HOUR = 60 * MIN;
+  const DAY = 24 * HOUR;
+  const at = (ms) => new Date(T0.getTime() + ms);
+  const keys = async (db) => (await db.select({ key: rateLimits.key }).from(rateLimits)).map((r) => r.key).sort();
+
+  async function seed(db) {
+    const old = at(-25 * HOUR);
+    await db.insert(rateLimits).values([
+      // ventana vieja, sin fallos ni bloqueo → se borra
+      { key: 'viejo', count: 3, windowStart: old },
+      // ventana vieja, fallos viejos y bloqueo vencido → se borra
+      { key: 'viejo-fallos', count: 0, windowStart: old, failures: 4, lastFailureAt: old, lockedUntil: at(-24 * HOUR) },
+      // ventana reciente → se queda
+      { key: 'reciente', count: 1, windowStart: at(-HOUR) },
+      // ventana vieja pero bloqueo vigente → se queda
+      { key: 'bloqueado', count: 0, windowStart: old, failures: 20, lastFailureAt: old, lockedUntil: at(HOUR) },
+      // ventana vieja pero fallo reciente (aún cuenta para la escala) → se queda
+      { key: 'fallo-reciente', count: 0, windowStart: old, failures: 3, lastFailureAt: at(-2 * HOUR) },
+    ]);
+  }
+
+  it('purgeStaleRateLimits borra solo filas sin ventana, bloqueo ni fallos en las últimas 24 h', async () => {
+    const db = await createTestDb();
+    await seed(db);
+    const deleted = await purgeStaleRateLimits(db, T0);
+    expect(deleted).toBe(2);
+    expect(await keys(db)).toEqual(['bloqueado', 'fallo-reciente', 'reciente']);
+  });
+
+  it('una fila con ventana de exactamente 24 h no se borra', async () => {
+    const db = await createTestDb();
+    await db.insert(rateLimits).values({ key: 'justo', count: 1, windowStart: at(-DAY) });
+    expect(await purgeStaleRateLimits(db, T0)).toBe(0);
+  });
+
+  it('consume limpia de forma oportunista cuando el sorteo lo indica', async () => {
+    const db = await createTestDb();
+    await seed(db);
+    await consume(db, { key: 'nuevo', limit: 10, windowMs: MIN, now: T0, random: () => 0 });
+    expect(await keys(db)).toEqual(['bloqueado', 'fallo-reciente', 'nuevo', 'reciente']);
+  });
+
+  it('consume no limpia cuando el sorteo no toca', async () => {
+    const db = await createTestDb();
+    await seed(db);
+    await consume(db, { key: 'nuevo', limit: 10, windowMs: MIN, now: T0, random: () => 0.5 });
+    expect(await keys(db)).toHaveLength(6);
   });
 });

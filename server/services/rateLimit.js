@@ -1,14 +1,17 @@
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, isNull, lt, or, sql } from 'drizzle-orm';
 import { rateLimits } from '../db/schema.js';
 
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
+// Probabilidad de que una llamada a consume purgue filas viejas (1 de cada 100).
+const PURGE_PROBABILITY = 0.01;
 
 const ts = (date) => sql`${date.toISOString()}::timestamptz`;
 const ms = (value) => sql`(${value}::double precision * interval '1 millisecond')`;
 
 // Ventana fija con upsert atómico: una sola sentencia incrementa o reinicia.
-export async function consume(db, { key, limit, windowMs, now }) {
+// De forma oportunista (según `random`, inyectable en tests) purga filas viejas.
+export async function consume(db, { key, limit, windowMs, now, random = Math.random }) {
   const nowTs = ts(now);
   const expired = sql`${nowTs} - ${rateLimits.windowStart} >= ${ms(windowMs)}`;
   const [row] = await db
@@ -23,9 +26,29 @@ export async function consume(db, { key, limit, windowMs, now }) {
     })
     .returning({ count: rateLimits.count, windowStart: rateLimits.windowStart });
 
+  if (random() < PURGE_PROBABILITY) await purgeStaleRateLimits(db, now);
+
   if (row.count <= limit) return { allowed: true, retryAfterMs: 0 };
   const retryAfterMs = row.windowStart.getTime() + windowMs - now.getTime();
   return { allowed: false, retryAfterMs: Math.max(retryAfterMs, 0) };
+}
+
+// Borra las filas que ya no influyen en ningún límite: ventana de hace más de
+// 24 h, sin bloqueo vigente y sin fallos en las últimas 24 h (la escala de
+// bloqueo los reinicia pasado ese plazo). Devuelve cuántas borró.
+export async function purgeStaleRateLimits(db, now) {
+  const dayAgo = new Date(now.getTime() - DAY_MS);
+  const deleted = await db
+    .delete(rateLimits)
+    .where(
+      and(
+        lt(rateLimits.windowStart, dayAgo),
+        or(isNull(rateLimits.lockedUntil), lt(rateLimits.lockedUntil, now)),
+        or(isNull(rateLimits.lastFailureAt), lt(rateLimits.lastFailureAt, dayAgo)),
+      ),
+    )
+    .returning({ key: rateLimits.key });
+  return deleted.length;
 }
 
 // Cuenta un fallo y fija el bloqueo según la escala 10 -> 15 min, 15 -> 1 h, 20 -> 24 h.
