@@ -49,3 +49,21 @@ describe('esquema de base de datos', () => {
     ).rejects.toThrow();
   });
 });
+
+describe('aislamiento de createTestDb', () => {
+  it('las bases de datos de test son independientes entre sí', async () => {
+    const a = await createTestDb();
+    const b = await createTestDb();
+    await a.insert(projects).values({
+      slug: 'solo-en-a',
+      position: 0,
+      title: 'A',
+      descriptionEn: 'A',
+      descriptionEs: 'A',
+      imageUrl: 'https://res.cloudinary.com/x/y.png',
+      tech: [],
+    });
+    expect(await a.select().from(projects)).toHaveLength(1);
+    expect(await b.select().from(projects)).toHaveLength(0);
+  });
+});

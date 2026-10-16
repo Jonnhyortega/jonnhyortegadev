@@ -13,5 +13,9 @@ export default defineConfig({
     // Cada test del servidor levanta un PGlite en memoria; en paralelo tarda más de 5 s.
     testTimeout: 30000,
     hookTimeout: 30000,
+    // Tope de workers: cada uno carga PGlite (WASM) y argon2; sin tope se agota la memoria.
+    globalSetup: ['tests/server/helpers/globalSetup.js'],
+    pool: 'forks',
+    maxWorkers: 2,
   },
 });

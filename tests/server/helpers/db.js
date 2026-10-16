@@ -1,6 +1,7 @@
 import { PGlite } from '@electric-sql/pglite';
 import { drizzle } from 'drizzle-orm/pglite';
 import { migrate } from 'drizzle-orm/pglite/migrator';
+import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import * as schema from '../../../server/db/schema.js';
 
@@ -8,10 +9,55 @@ const migrationsFolder = fileURLToPath(
   new URL('../../../server/db/migrations', import.meta.url),
 );
 
-// Base de datos PGlite en memoria con las migraciones aplicadas.
+// Volcado de una base migrada, usado como plantilla de cada instancia.
+export async function buildTemplateDump() {
+  const seed = new PGlite();
+  await migrate(drizzle(seed, { schema }), { migrationsFolder });
+  const dump = await seed.dumpDataDir('none');
+  await seed.close();
+  return dump;
+}
+
+// La plantilla la deja lista globalSetup (una sola migración para toda la corrida);
+// si falta (p. ej. al ejecutar el archivo fuera de vitest) se construye en el worker.
+let templatePromise;
+
+function getTemplate() {
+  templatePromise ??= process.env.PGLITE_TEMPLATE_FILE
+    ? readFile(process.env.PGLITE_TEMPLATE_FILE).then((buf) => new Blob([buf]))
+    : buildTemplateDump();
+  return templatePromise;
+}
+
+// Pool acotado de instancias: cada PGlite retiene cientos de MB de memoria WASM que
+// close() no libera, y los tests no las cierran. Se crean como mucho MAX_LIVE por worker
+// (copias independientes de la plantilla) y se reutilizan en rotación, vaciando sus
+// tablas al entregarlas, de modo que cada test recibe una base vacía y sin estado previo.
+// Dos bases pedidas seguidas son independientes mientras no haya más de MAX_LIVE en uso.
+const MAX_LIVE = 3;
+const pool = [];
+let next = 0;
+
+async function resetTables(client) {
+  const { rows } = await client.query(
+    "SELECT tablename FROM pg_tables WHERE schemaname = 'public'",
+  );
+  if (rows.length === 0) return;
+  const names = rows.map((r) => `"${r.tablename}"`).join(', ');
+  await client.exec(`TRUNCATE ${names} RESTART IDENTITY CASCADE`);
+}
+
+// Base de datos PGlite en memoria con las migraciones aplicadas y todas las tablas vacías.
 export async function createTestDb() {
-  const client = new PGlite();
-  const db = drizzle(client, { schema });
-  await migrate(db, { migrationsFolder });
-  return db;
+  let client;
+  if (pool.length < MAX_LIVE) {
+    const template = await getTemplate();
+    client = new PGlite({ loadDataDir: template });
+    await client.waitReady;
+    pool.push(client);
+  } else {
+    client = pool[next++ % MAX_LIVE];
+    await resetTables(client);
+  }
+  return drizzle(client, { schema });
 }
