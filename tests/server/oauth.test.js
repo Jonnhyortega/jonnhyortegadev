@@ -71,11 +71,24 @@ function expectOauthCookieCleared(res) {
   expect(cleared).toMatch(/Path=\//);
 }
 
+function expectPanelReturnCookie(res) {
+  const cookie = findCookie(res, '__Host-panel-return');
+  expect(cookie).toBeDefined();
+  expect(cookie).toMatch(/^__Host-panel-return=[A-Za-z0-9_-]{22};/);
+  expect(cookie).toMatch(/HttpOnly/);
+  expect(cookie).toMatch(/Secure/);
+  expect(cookie).toMatch(/SameSite=Lax/);
+  expect(cookie).toMatch(/Path=\//);
+  expect(cookie).toMatch(/Max-Age=120/);
+  expect(cookie).not.toMatch(/Domain=/i);
+}
+
 async function expectRejected(ctx, res, reason) {
   expect(res.status).toBe(302);
   expect(res.headers.location).toBe('/__panel-return?error=1');
   expect(sessionCookie(res)).toBeUndefined();
   expectOauthCookieCleared(res);
+  expectPanelReturnCookie(res);
   // Todos los eventos del test comparten la hora del reloj falso: se compara
   // el conjunto de motivos de rechazo, no el orden.
   const reasons = (await auditEvents(ctx))
@@ -160,6 +173,7 @@ describe('GET /api/auth/google/callback', () => {
     expect(cookie).toMatch(/Path=\//);
     expect(cookie).toMatch(/Max-Age=28800/);
     expectOauthCookieCleared(res);
+    expectPanelReturnCookie(res);
 
     // El code_verifier del flujo es el que se usa en el intercambio.
     expect(ctx.google.exchanges).toHaveLength(1);
@@ -380,6 +394,7 @@ describe('GET /api/auth/google/callback', () => {
     const res = await callback(ctx, { code: 'auth-code', state }, [bindingCookie]);
     expect(res.status).toBe(302);
     expect(res.headers.location).toBe('/__panel-return?error=1');
+    expectPanelReturnCookie(res);
     expect(sessionCookie(res)).toBeUndefined();
     expectOauthCookieCleared(res);
   });

@@ -5,9 +5,10 @@ export default function Dashboard({ csrf, onLoggedOut }) {
   const logout = async () => {
     try {
       await api('/api/auth/logout', { method: 'POST', csrf })
-    } finally {
-      onLoggedOut()
+    } catch {
+      // Si falla, igual se vuelve a consultar la sesión para mostrar el estado real.
     }
+    onLoggedOut()
   }
 
   return (

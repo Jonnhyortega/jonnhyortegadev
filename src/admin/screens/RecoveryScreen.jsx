@@ -1,11 +1,12 @@
 import { useState } from 'react'
-import { api } from '../api.js'
+import { api, ApiError } from '../api.js'
 
 export default function RecoveryScreen({ csrf }) {
   const [codes, setCodes] = useState(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [expired, setExpired] = useState(false)
 
   const generate = async () => {
     setBusy(true)
@@ -13,8 +14,13 @@ export default function RecoveryScreen({ csrf }) {
     try {
       const data = await api('/api/admin/security/recovery-codes', { method: 'POST', csrf })
       setCodes(data.codes)
-    } catch {
-      setError('No se pudieron generar los códigos.')
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 404) {
+        setExpired(true)
+        setError('La sesión de recuperación venció. Volvé a entrar con Google.')
+      } else {
+        setError('No se pudieron generar los códigos.')
+      }
     } finally {
       setBusy(false)
     }
@@ -62,6 +68,13 @@ export default function RecoveryScreen({ csrf }) {
               Volver a entrar con Google
             </a>
           </>
+        ) : expired ? (
+          <a
+            href="/api/auth/google/start"
+            className="block w-full rounded-lg bg-purple-600 px-4 py-2 text-center font-medium hover:bg-purple-500"
+          >
+            Volver a entrar con Google
+          </a>
         ) : (
           <button
             type="button"

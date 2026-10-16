@@ -2,7 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { handle, config } from '../../middleware.js';
 
 const PROD = { VERCEL_ENV: 'production', ADMIN_PATH: '/test-panel-path' };
-const req = (path) => new Request(`https://example.com${path}`);
+const COOKIE = '__Host-panel-return=abc123';
+const req = (path, { cookie } = {}) =>
+  new Request(`https://example.com${path}`, { headers: cookie ? { cookie } : {} });
 
 describe('middleware del panel', () => {
   it('oculta /admin.html con un 404', async () => {
@@ -30,21 +32,55 @@ describe('middleware del panel', () => {
     expect(handle(req('/test-panel-path'), { VERCEL_ENV: 'production' })).toBeUndefined();
   });
 
-  it('redirige /__panel-return a la ruta secreta', () => {
-    const res = handle(req('/__panel-return'), PROD);
+  it('redirige /__panel-return a la ruta secreta solo con la cookie de retorno', () => {
+    const res = handle(req('/__panel-return', { cookie: COOKIE }), PROD);
     expect(res.status).toBe(302);
     expect(new URL(res.headers.get('location')).pathname).toBe('/test-panel-path');
   });
 
-  it('conserva ?error=1 al redirigir', () => {
-    const res = handle(req('/__panel-return?error=1'), PROD);
+  it('conserva solo error=1 al redirigir', () => {
+    const res = handle(req('/__panel-return?error=1&x=2', { cookie: COOKIE }), PROD);
     expect(res.status).toBe(302);
     const loc = new URL(res.headers.get('location'));
     expect(loc.pathname + loc.search).toBe('/test-panel-path?error=1');
   });
 
+  it('borra la cookie de retorno al redirigir', () => {
+    const res = handle(req('/__panel-return', { cookie: COOKIE }), PROD);
+    const cleared = res.headers.get('set-cookie');
+    expect(cleared).toMatch(/^__Host-panel-return=;/);
+    expect(cleared).toMatch(/Max-Age=0/);
+    expect(cleared).toMatch(/HttpOnly/);
+    expect(cleared).toMatch(/Secure/);
+    expect(cleared).toMatch(/SameSite=Lax/);
+    expect(cleared).toMatch(/Path=\//);
+  });
+
+  it('sin la cookie, /__panel-return no revela la ruta (pasa de largo)', () => {
+    expect(handle(req('/__panel-return'), PROD)).toBeUndefined();
+    expect(handle(req('/__panel-return?error=1'), PROD)).toBeUndefined();
+    expect(handle(req('/__panel-return', { cookie: 'otra=1' }), PROD)).toBeUndefined();
+  });
+
   it('no redirige /__panel-return fuera de producción', () => {
-    expect(handle(req('/__panel-return'), { ...PROD, VERCEL_ENV: 'preview' })).toBeUndefined();
+    expect(
+      handle(req('/__panel-return', { cookie: COOKIE }), { ...PROD, VERCEL_ENV: 'preview' }),
+    ).toBeUndefined();
+  });
+
+  it.each([
+    '/%61dmin.html',
+    '/admin%2Ehtml',
+    '//admin.html',
+    '/ADMIN.HTML',
+    '/admin.html/',
+    '/x/../admin.html',
+  ])('oculta variantes de /admin.html: %s', (path) => {
+    expect(handle(req(path), PROD).status).toBe(404);
+  });
+
+  it('una ruta con codificación inválida da 404', () => {
+    expect(handle(req('/%E0%A4%A'), PROD).status).toBe(404);
   });
 
   it('deja pasar el resto de las rutas', () => {
