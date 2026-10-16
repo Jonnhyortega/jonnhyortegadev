@@ -10,5 +10,8 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['tests/**/*.test.js'],
+    // Cada test del servidor levanta un PGlite en memoria; en paralelo tarda más de 5 s.
+    testTimeout: 30000,
+    hookTimeout: 30000,
   },
 });
