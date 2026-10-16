@@ -14,10 +14,12 @@ export function hmacIp(secret, ip) {
   return createHmac('sha256', secret).update(String(ip)).digest('hex');
 }
 
-// Comparación en tiempo constante; false si las longitudes difieren.
+// Comparación en tiempo constante; false si las longitudes difieren o si
+// algún argumento no es string (nunca lanza: evita que null == 'null').
 export function safeEqual(a, b) {
-  const left = Buffer.from(String(a));
-  const right = Buffer.from(String(b));
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
+  const left = Buffer.from(a);
+  const right = Buffer.from(b);
   if (left.length !== right.length) return false;
   return timingSafeEqual(left, right);
 }
