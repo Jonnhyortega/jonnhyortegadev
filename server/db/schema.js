@@ -4,6 +4,7 @@ import {
   uuid,
   text,
   integer,
+  bigint,
   boolean,
   jsonb,
   timestamp,
@@ -120,6 +121,8 @@ export const contentRevisions = pgTable(
   'content_revisions',
   {
     id: uuid('id').primaryKey().defaultRandom(),
+    // Orden de escritura estable (los timestamps pueden repetirse).
+    seq: bigint('seq', { mode: 'number' }).generatedAlwaysAsIdentity(),
     entity: text('entity').notNull(),
     data: jsonb('data').notNull(),
     createdAt: createdAt(),

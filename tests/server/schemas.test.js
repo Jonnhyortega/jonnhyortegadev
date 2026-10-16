@@ -91,3 +91,38 @@ describe('withVersion', () => {
     expect(s.safeParse({ data: base, version: 0, x: 1 }).success).toBe(false);
   });
 });
+
+describe('endurecimiento de URLs y textos de proyecto', () => {
+  const { id: _id, ...base } = DEFAULT_PROJECTS[0];
+  const parse = (over) => projectInputSchema.safeParse({ ...base, ...over });
+
+  it('rechaza espacios, backslashes y control antes de parsear', () => {
+    for (const bad of [
+      'https:\\\\res.cloudinary.com\\x',
+      'https://res.cloudinary.com\\@evil.com/x',
+      'https://res.cloud\ninary.com/x',
+      '  https://res.cloudinary.com/x',
+      'https://res.cloudinary.com/a\tb',
+    ]) {
+      expect(parse({ imageUrl: bad }).success).toBe(false);
+      expect(parse({ liveUrl: bad.replace('res.cloudinary.com', 'x.com') }).success).toBe(false);
+      expect(parse({ githubUrl: bad.replace('res.cloudinary.com', 'x.com') }).success).toBe(false);
+    }
+  });
+
+  it('persiste la forma canónica', () => {
+    const r = parse({
+      imageUrl: 'https://RES.cloudinary.com/a.png',
+      liveUrl: 'https://EXAMPLE.com',
+    });
+    expect(r.success).toBe(true);
+    expect(r.data.imageUrl).toBe('https://res.cloudinary.com/a.png');
+    expect(r.data.liveUrl).toBe('https://example.com/');
+  });
+
+  it('rechaza caracteres de control en título y descripciones', () => {
+    expect(parse({ title: 'a\u0000b' }).success).toBe(false);
+    expect(parse({ descriptionEn: 'a\u0007b' }).success).toBe(false);
+    expect(parse({ descriptionEs: 'a\u007Fb' }).success).toBe(false);
+  });
+});

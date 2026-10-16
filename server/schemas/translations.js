@@ -4,12 +4,14 @@ import { DEFAULT_TRANSLATIONS } from '../../src/content/defaults.js';
 // Rechaza caracteres de control (salvo tab, salto de línea y retorno).
 const SIN_CONTROL = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/;
 
+export const sinControl = (value) => !SIN_CONTROL.test(value);
+
 const leaf = () =>
   z
     .string()
     .min(1)
     .max(500)
-    .refine((v) => !SIN_CONTROL.test(v), { message: 'caracteres de control no permitidos' });
+    .refine(sinControl, { message: 'caracteres de control no permitidos' });
 
 // Construye un esquema estricto con la misma forma que el árbol de textos
 // por defecto: solo se aceptan las claves existentes y hojas de texto.

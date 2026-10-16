@@ -15,6 +15,13 @@
       "when": 1792163335462,
       "tag": "0001_square_harpoon",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792167376043,
+      "tag": "0002_needy_human_cannonball",
+      "breakpoints": true
     }
   ]
 }

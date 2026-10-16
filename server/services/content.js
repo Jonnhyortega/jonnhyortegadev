@@ -1,8 +1,12 @@
 import { randomUUID } from 'node:crypto';
+import { z } from 'zod';
 import { and, asc, desc, eq, inArray, notInArray, sql } from 'drizzle-orm';
 import { contentRevisions, projects, theme, translations } from '../db/schema.js';
 import { HttpError, NotFoundError, VersionConflictError } from '../lib/errors.js';
 import { themeToCssVars } from '../../src/content/theme.js';
+import { projectInputSchema } from '../schemas/projects.js';
+import { themeSchema } from '../schemas/theme.js';
+import { translationsSchema } from '../schemas/translations.js';
 
 const MAX_REVISIONS = 30;
 const SINGLETONS = { translations, theme };
@@ -86,7 +90,7 @@ async function addRevision(tx, entity, data, now) {
     .select({ id: contentRevisions.id })
     .from(contentRevisions)
     .where(eq(contentRevisions.entity, entity))
-    .orderBy(desc(contentRevisions.createdAt), desc(contentRevisions.id))
+    .orderBy(desc(contentRevisions.seq))
     .offset(MAX_REVISIONS);
   if (stale.length > 0) {
     await tx.delete(contentRevisions).where(
@@ -204,24 +208,68 @@ export async function listRevisions(db, entity) {
     })
     .from(contentRevisions)
     .where(eq(contentRevisions.entity, entity))
-    .orderBy(desc(contentRevisions.createdAt), desc(contentRevisions.id));
+    .orderBy(desc(contentRevisions.seq));
 }
 
+const SNAPSHOT_META = z
+  .object({
+    id: z.string().uuid(),
+    slug: z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/).max(80),
+    position: z.number().int().nonnegative(),
+  });
+
+const EDITABLE_KEYS = [
+  'title',
+  'descriptionEn',
+  'descriptionEs',
+  'imageUrl',
+  'liveUrl',
+  'githubUrl',
+  'tech',
+  'published',
+];
+
+// Valida la foto de proyectos con los esquemas ACTUALES. Devuelve las filas
+// listas para escribir o lanza revision_incompatible.
+function parseProjectsSnapshot(snapshot) {
+  if (!Array.isArray(snapshot)) throw incompatible();
+  const rows = snapshot.map((item) => {
+    if (item === null || typeof item !== 'object') throw incompatible();
+    const meta = SNAPSHOT_META.safeParse({ id: item.id, slug: item.slug, position: item.position });
+    const editable = projectInputSchema.safeParse(
+      Object.fromEntries(EDITABLE_KEYS.map((key) => [key, item[key]])),
+    );
+    if (!meta.success || !editable.success) throw incompatible();
+    return { ...meta.data, ...editable.data };
+  });
+  if (
+    new Set(rows.map((r) => r.id)).size !== rows.length ||
+    new Set(rows.map((r) => r.slug)).size !== rows.length
+  ) {
+    throw incompatible();
+  }
+  return rows;
+}
+
+const incompatible = () => new HttpError(409, 'revision_incompatible');
+
+const SINGLETON_SCHEMAS = { translations: translationsSchema, theme: themeSchema };
+
 // Restaura una revisión como una escritura nueva: incrementa versión y deja
-// su propia revisión.
+// su propia revisión. La foto se revalida con el esquema vigente; si ya no
+// es compatible, no se escribe nada (409 revision_incompatible).
 export async function restoreRevision(db, { id, now }) {
   return db.transaction(async (tx) => {
     const [revision] = await tx.select().from(contentRevisions).where(eq(contentRevisions.id, id));
     if (!revision) throw new NotFoundError();
 
     if (revision.entity === 'projects') {
-      const snapshot = revision.data;
-      const keep = snapshot.map((p) => p.id);
+      const rows = parseProjectsSnapshot(revision.data);
+      const keep = rows.map((p) => p.id);
       await (keep.length > 0
         ? tx.delete(projects).where(notInArray(projects.id, keep))
         : tx.delete(projects));
-      for (const p of snapshot) {
-        const { id: projectId, version: _version, ...fields } = p;
+      for (const { id: projectId, ...fields } of rows) {
         const updated = await tx
           .update(projects)
           .set({ ...fields, version: sql`${projects.version} + 1`, updatedAt: now })
@@ -237,14 +285,17 @@ export async function restoreRevision(db, { id, now }) {
       return { entity: 'projects', data: (await orderedProjects(tx)).map(toAdminProject) };
     }
 
+    const schema = SINGLETON_SCHEMAS[revision.entity];
+    const parsed = schema.safeParse(revision.data);
+    if (!parsed.success) throw incompatible();
     const table = SINGLETONS[revision.entity];
     const rows = await tx
       .update(table)
-      .set({ data: revision.data, version: sql`${table.version} + 1`, updatedAt: now })
+      .set({ data: parsed.data, version: sql`${table.version} + 1`, updatedAt: now })
       .where(eq(table.id, 1))
       .returning({ version: table.version });
     if (rows.length === 0) throw new NotFoundError();
-    await addRevision(tx, revision.entity, revision.data, now);
-    return { entity: revision.entity, data: revision.data, version: rows[0].version };
+    await addRevision(tx, revision.entity, parsed.data, now);
+    return { entity: revision.entity, data: parsed.data, version: rows[0].version };
   });
 }

@@ -1,47 +1,55 @@
 import { z } from 'zod';
 import { TECH_KEYS } from '../../src/content/defaults.js';
+import { sinControl } from './translations.js';
 
 export const IMAGE_HOSTS = ['res.cloudinary.com', 'upload.wikimedia.org'];
 
-function parseUrl(value) {
+// Cualquier espacio, backslash o carácter de control se rechaza ANTES de
+// parsear: así el valor validado es el mismo que interpretará el navegador.
+const RAW_PROHIBIDO = /[\s\\\u0000-\u001F\u007F]/;
+
+function parseHttps(value) {
+  if (RAW_PROHIBIDO.test(value)) return null;
+  let url;
   try {
-    return new URL(value);
+    url = new URL(value);
   } catch {
     return null;
   }
-}
-
-// https, sin credenciales; devuelve la URL parseada o null.
-function httpsUrl(value) {
-  const url = parseUrl(value);
-  if (!url || url.protocol !== 'https:') return null;
-  if (url.username || url.password) return null;
+  if (url.protocol !== 'https:' || url.username || url.password) return null;
   return url;
 }
 
-const imageUrl = z
-  .string()
-  .max(500)
-  .refine(
-    (value) => {
-      const url = httpsUrl(value);
-      // `port` vacío = puerto por defecto de https.
-      return !!url && url.port === '' && IMAGE_HOSTS.includes(url.hostname);
-    },
-    { message: 'imageUrl debe ser https de un host permitido' },
-  );
+// Valida y persiste solo la forma canónica (href).
+const safeUrl = (accept) =>
+  z
+    .string()
+    .max(500)
+    .refine(
+      (value) => {
+        const url = parseHttps(value);
+        return url !== null && accept(url);
+      },
+      { message: 'URL no permitida' },
+    )
+    .transform((value) => new URL(value).href);
 
-const linkUrl = z
-  .string()
-  .max(500)
-  .refine((value) => httpsUrl(value) !== null, { message: 'solo https' })
-  .nullable();
+// `port` vacío = puerto por defecto de https.
+const imageUrl = safeUrl((url) => url.port === '' && IMAGE_HOSTS.includes(url.hostname));
+const linkUrl = safeUrl(() => true).nullable();
+
+const text = (max) =>
+  z
+    .string()
+    .min(1)
+    .max(max)
+    .refine(sinControl, { message: 'caracteres de control no permitidos' });
 
 export const projectInputSchema = z
   .object({
-    title: z.string().min(1).max(80),
-    descriptionEn: z.string().min(1).max(300),
-    descriptionEs: z.string().min(1).max(300),
+    title: text(80),
+    descriptionEn: text(300),
+    descriptionEs: text(300),
     imageUrl,
     liveUrl: linkUrl,
     githubUrl: linkUrl,
