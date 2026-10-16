@@ -7,6 +7,7 @@ import { createTranslationsRouter } from './translations.js';
 import { createThemeRouter } from './theme.js';
 import { createProjectsRouter } from './projects.js';
 import { createRevisionsRouter } from './revisions.js';
+import { createSecurityRouter, createRecoveryCodesHandler } from './security.js';
 import { SAFE_METHODS } from '../../middleware/jsonOnly.js';
 
 const MIN = 60_000;
@@ -38,8 +39,9 @@ export function createAdminRouter(deps) {
     res.json({ kind, csrfToken: csrfSecret, expiresAt });
   });
 
-  // RUTAS PERMITIDAS A RECOVERY: aquí (y solo aquí) se monta en Task 13
-  // `POST /security/recovery-codes`. Ninguna otra ruta va antes de la puerta.
+  // RUTAS PERMITIDAS A RECOVERY: solo `POST /security/recovery-codes` (R18).
+  // Ninguna otra ruta va antes de la puerta.
+  router.post('/security/recovery-codes', createRecoveryCodesHandler(deps));
 
   // Puerta full-only: falla cerrado para cualquier subrouter futuro.
   router.use(requireSession('full'));
@@ -48,6 +50,7 @@ export function createAdminRouter(deps) {
   router.use('/theme', createThemeRouter(deps));
   router.use('/projects', createProjectsRouter(deps));
   router.use('/revisions', createRevisionsRouter(deps));
+  router.use('/security', createSecurityRouter(deps));
 
   return router;
 }
