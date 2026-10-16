@@ -18,6 +18,7 @@ const editablePalette = (name) =>
 export default {
   content: [
     "./index.html",
+    "./admin.html",
     "./src/**/*.{js,jsx,ts,tsx}",
   ],
   theme: {
