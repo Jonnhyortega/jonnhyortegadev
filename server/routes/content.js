@@ -9,7 +9,7 @@ export function createContentRouter({ db }) {
   router.get('/', async (req, res) => {
     try {
       const content = await getPublicContent(db);
-      res.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=600');
+      res.set('Cache-Control', 'public, max-age=0, s-maxage=60, stale-while-revalidate=600');
       res.json(content);
     } catch (error) {
       console.error(`[${req.id}] contenido no disponible:`, error?.message ?? 'error');

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import ConfirmDialog from '../components/ConfirmDialog.jsx'
 import ProjectForm from '../components/ProjectForm.jsx'
+import { ApiError } from '../api.js'
 import { describeError } from '../lib/errors.js'
 import { emptyProject, moveItem, toInput } from '../lib/projects.js'
 
@@ -34,8 +35,11 @@ export default function ProjectsTab({ call }) {
       await fn()
       return true
     } catch (err) {
-      setError(describeError(err))
-      return false
+      const described = describeError(err)
+      // Conflicto o elemento borrado: se refresca la lista y luego se muestra el aviso.
+      if (described.conflict || described.gone) await load()
+      setError(described)
+      return described.conflict || described.gone ? 'stale' : false
     } finally {
       setBusy(false)
     }
@@ -60,9 +64,12 @@ export default function ProjectsTab({ call }) {
     const data = toInput(form)
     const ok = await run(async () => {
       if (editing.project) {
-        const saved = await call(`/api/admin/projects/${editing.project.id}`, {
+        // Siempre con la versión actual de la lista, no la del momento de abrir el formulario.
+        const current = projects.find((p) => p.id === editing.project.id)
+        if (!current) throw new ApiError(404, 'not_found')
+        const saved = await call(`/api/admin/projects/${current.id}`, {
           method: 'PUT',
-          body: { data, version: editing.project.version },
+          body: { data, version: current.version },
         })
         setProjects((list) => list.map((p) => (p.id === saved.id ? saved : p)))
       } else {
@@ -70,7 +77,7 @@ export default function ProjectsTab({ call }) {
         setProjects((list) => [...list, created])
       }
     })
-    if (ok) setEditing(null)
+    if (ok === true || ok === 'stale') setEditing(null)
   }
 
   const remove = async () => {

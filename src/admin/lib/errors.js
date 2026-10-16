@@ -20,6 +20,9 @@ export function describeError(err) {
   if (err.status === 400 && err.code === 'invalid_order') {
     return { message: 'El orden no es válido; recargá la lista.', fields: [] }
   }
+  if (err.status === 404) {
+    return { message: 'El elemento ya no existe; recargá la lista.', gone: true, fields: [] }
+  }
   if (err.status === 429) return { message: 'Demasiados intentos; esperá un momento.', fields: [] }
   return { message: 'No se pudo completar la operación.', fields: [] }
 }

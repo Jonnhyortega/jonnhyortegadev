@@ -19,7 +19,7 @@ import {
   updateProject,
 } from '../../server/services/content.js';
 
-const CACHE = 'public, s-maxage=60, stale-while-revalidate=600';
+const CACHE = 'public, max-age=0, s-maxage=60, stale-while-revalidate=600';
 
 describe('GET /api/content', () => {
   it('tras el seed devuelve proyectos publicados en orden, con cabeceras de caché', async () => {

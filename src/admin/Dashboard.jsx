@@ -19,7 +19,14 @@ export default function Dashboard({ csrf, onLoggedOut }) {
       try {
         return await api(path, { ...opts, csrf })
       } catch (err) {
-        if (err instanceof ApiError && err.status === 404) onLoggedOut()
+        if (err instanceof ApiError && err.status === 404) {
+          // Un 404 puede ser un elemento borrado o una sesión caída: se distingue con /me.
+          try {
+            await api('/api/admin/me')
+          } catch (meErr) {
+            if (meErr instanceof ApiError && meErr.status === 404) onLoggedOut()
+          }
+        }
         throw err
       }
     },

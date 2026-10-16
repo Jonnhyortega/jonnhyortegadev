@@ -27,21 +27,29 @@ export default function SecurityTab({ call, onLoggedOut }) {
   const [notice, setNotice] = useState(null) // { text, ok }
   const [codes, setCodes] = useState(null)
   const [confirmAll, setConfirmAll] = useState(false)
+  const [confirmCodes, setConfirmCodes] = useState(false)
+  const [toRestore, setToRestore] = useState(null) // { id, label, createdAt }
   const [busy, setBusy] = useState(false)
 
   const loadAll = useCallback(async () => {
-    try {
-      const [s, a, ...r] = await Promise.all([
-        call('/api/admin/security/sessions'),
-        call('/api/admin/security/audit'),
-        ...ENTITIES.map(([key]) => call(`/api/admin/revisions/${key}`)),
-      ])
-      setSessions(s)
-      setAudit(a)
-      setRevisions(Object.fromEntries(ENTITIES.map(([key], i) => [key, r[i]])))
-    } catch (err) {
-      setNotice({ text: describeError(err).message, ok: false })
-    }
+    const results = await Promise.allSettled([
+      call('/api/admin/security/sessions'),
+      call('/api/admin/security/audit'),
+      ...ENTITIES.map(([key]) => call(`/api/admin/revisions/${key}`)),
+    ])
+    const [s, a, ...r] = results
+    // Cada sección se actualiza si su pedido salió bien; un fallo no vacía a las demás.
+    if (s.status === 'fulfilled') setSessions(s.value)
+    if (a.status === 'fulfilled') setAudit(a.value)
+    setRevisions((prev) => {
+      const next = { ...prev }
+      ENTITIES.forEach(([key], i) => {
+        if (r[i].status === 'fulfilled') next[key] = r[i].value
+      })
+      return next
+    })
+    const failed = results.find((x) => x.status === 'rejected')
+    if (failed) setNotice({ text: describeError(failed.reason).message, ok: false })
   }, [call])
 
   useEffect(() => {
@@ -61,18 +69,22 @@ export default function SecurityTab({ call, onLoggedOut }) {
     }
   }
 
-  const restore = (id) =>
-    run(async () => {
-      await call(`/api/admin/revisions/${id}/restore`, { method: 'POST' })
+  const restore = (rev) => {
+    setToRestore(null)
+    return run(async () => {
+      await call(`/api/admin/revisions/${rev.id}/restore`, { method: 'POST' })
       await loadAll()
     }, 'Versión restaurada. Las otras pestañas se recargan al abrirlas.')
+  }
 
-  const generateCodes = () =>
-    run(async () => {
+  const generateCodes = () => {
+    setConfirmCodes(false)
+    return run(async () => {
       // Los códigos solo viven en este estado mientras el diálogo está abierto.
       const res = await call('/api/admin/security/recovery-codes', { method: 'POST' })
       setCodes(res.codes)
     })
+  }
 
   const revokeAll = async () => {
     setConfirmAll(false)
@@ -112,7 +124,7 @@ export default function SecurityTab({ call, onLoggedOut }) {
         <p className="text-sm text-white/70">
           Generar códigos nuevos invalida los anteriores. Se muestran una sola vez.
         </p>
-        <button type="button" className={btn} disabled={busy} onClick={generateCodes}>
+        <button type="button" className={btn} disabled={busy} onClick={() => setConfirmCodes(true)}>
           Generar códigos de recuperación
         </button>
       </Section>
@@ -126,7 +138,7 @@ export default function SecurityTab({ call, onLoggedOut }) {
               {(revisions[key] ?? []).map((rev) => (
                 <li key={rev.id} className="flex items-center justify-between gap-3">
                   <span>{fmt(rev.createdAt)}</span>
-                  <button type="button" className={btn} disabled={busy} onClick={() => restore(rev.id)}>
+                  <button type="button" className={btn} disabled={busy} onClick={() => setToRestore({ ...rev, label })}>
                     Restaurar
                   </button>
                 </li>
@@ -147,6 +159,22 @@ export default function SecurityTab({ call, onLoggedOut }) {
         </ul>
       </Section>
 
+      <ConfirmDialog
+        open={confirmCodes}
+        onOpenChange={setConfirmCodes}
+        title="Generar códigos nuevos"
+        description="Los códigos de recuperación que tengas hoy dejan de funcionar. Los nuevos se muestran una sola vez."
+        confirmLabel="Generar"
+        onConfirm={generateCodes}
+      />
+      <ConfirmDialog
+        open={toRestore !== null}
+        onOpenChange={(open) => !open && setToRestore(null)}
+        title="Restaurar versión"
+        description={toRestore ? `El contenido actual de "${toRestore.label}" se reemplaza por la versión del ${fmt(toRestore.createdAt)}.` : ''}
+        confirmLabel="Restaurar"
+        onConfirm={() => restore(toRestore)}
+      />
       {codes && <CodesDialog codes={codes} onClose={() => setCodes(null)} />}
       <ConfirmDialog
         open={confirmAll}
