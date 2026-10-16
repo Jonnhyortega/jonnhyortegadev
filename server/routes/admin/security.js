@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { adminIdentity } from '../../db/schema.js';
 import { generateRecoveryCodes } from '../../services/recoveryCodes.js';
 import { listSessions, deleteSession, deleteAllSessions, clearSessionCookie } from '../../services/sessions.js';
 import { listAudit, recordAudit, requestContext } from '../../services/audit.js';
@@ -24,6 +25,25 @@ export function createRecoveryCodesHandler(deps) {
     }
     res.set('Cache-Control', 'no-store');
     res.json({ codes });
+  };
+}
+
+// POST /security/identity/reset: SOLO con sesión `recovery` (spec §4: una sesión
+// de recuperación permite vincular Google de nuevo). Desvincula la cuenta de
+// Google (google_sub = NULL) y fija el email a ADMIN_EMAIL; el próximo login con
+// Google vuelve a vincular por el camino del primer login (R38). La sesión de
+// recuperación termina aquí. Se monta ANTES de la puerta full-only.
+export function createIdentityResetHandler(deps) {
+  const { env, db, now } = deps;
+  return async (req, res) => {
+    const at = now();
+    await db.transaction(async (tx) => {
+      await tx.update(adminIdentity).set({ googleSub: null, email: env.adminEmail });
+      await recordAudit(tx, { event: 'identity_reset', ...requestContext(req, env), now: at });
+      await deleteSession(tx, req.session.id);
+    });
+    clearSessionCookie(res);
+    res.status(204).end();
   };
 }
 

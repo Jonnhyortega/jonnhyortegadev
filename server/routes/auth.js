@@ -131,9 +131,8 @@ export function createAuthRouter({ env, db, google, now }) {
       return { reason: 'email_not_allowed' };
     }
     if (identity.emailVerified !== true) return { reason: 'email_not_verified' };
-    if (!(await bindAdminIdentity(db, { email: env.adminEmail, sub: identity.sub }))) {
-      return { reason: 'sub_mismatch' };
-    }
+    const bindRejection = await bindAdminIdentity(db, { email: env.adminEmail, sub: identity.sub });
+    if (bindRejection) return { reason: bindRejection };
 
     // Contra fijación de sesión: la sesión previa (si la hay) se descarta y
     // siempre se emite un token nuevo. Sesión y auditoría van en una sola
@@ -258,7 +257,10 @@ export function createAuthRouter({ env, db, google, now }) {
 }
 
 // admin_identity tiene una sola fila. Si está vacía se crea con este sub; si
-// no tiene sub se completa; si ya tiene otro sub, se rechaza (false).
+// no tiene sub se completa. Devuelve null si el login puede seguir, o el motivo
+// de rechazo: `email_changed` si la fila es de otro email (ADMIN_EMAIL cambió:
+// solo la desvinculación desde una sesión recovery la actualiza, R38) o
+// `sub_mismatch` si ya está vinculada a otra cuenta de Google.
 async function bindAdminIdentity(db, { email, sub }) {
   return db.transaction(async (tx) => {
     // Serializa logins concurrentes (evita dos inserciones con la tabla vacía).
@@ -271,12 +273,13 @@ async function bindAdminIdentity(db, { email, sub }) {
 
     if (!row) {
       await tx.insert(adminIdentity).values({ email, googleSub: sub });
-      return true;
+      return null;
     }
+    if (row.email !== email) return 'email_changed';
     if (row.googleSub === null) {
       await tx.update(adminIdentity).set({ googleSub: sub }).where(eq(adminIdentity.id, row.id));
-      return true;
+      return null;
     }
-    return safeEqual(row.googleSub, sub);
+    return safeEqual(row.googleSub, sub) ? null : 'sub_mismatch';
   });
 }

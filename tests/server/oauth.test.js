@@ -330,6 +330,44 @@ describe('GET /api/auth/google/callback', () => {
     expect(identities[0].googleSub).toBe(SUB);
   });
 
+  it('tras desvincular Google con una sesión recovery, un login con un sub nuevo vuelve a vincular', async () => {
+    const ctx = await buildTestApp();
+    await login(ctx);
+    const recovery = await loginAs(ctx, 'recovery');
+    const reset = await request(ctx.app)
+      .post('/api/admin/security/identity/reset')
+      .set('Cookie', recovery.cookie)
+      .set('Origin', ORIGIN)
+      .set('X-CSRF-Token', recovery.csrf);
+    expect(reset.status).toBe(204);
+
+    const { res } = await login(ctx, { sub: 'sub-nuevo' });
+    expect(res.headers.location).toBe('/__panel-return');
+    expect(sessionCookie(res)).toBeDefined();
+    const identities = await ctx.db.select().from(adminIdentity);
+    expect(identities).toHaveLength(1);
+    expect(identities[0]).toMatchObject({ email: ADMIN, googleSub: 'sub-nuevo' });
+  });
+
+  it('ADMIN_EMAIL cambió sin desvincular → rechazado (email_changed) y la identidad no cambia', async () => {
+    const ctx = await buildTestApp();
+    await ctx.db.insert(adminIdentity).values({ email: 'viejo@gmail.com', googleSub: SUB });
+    const { res } = await login(ctx);
+    await expectRejected(ctx, res, 'email_changed');
+    const identities = await ctx.db.select().from(adminIdentity);
+    expect(identities).toHaveLength(1);
+    expect(identities[0]).toMatchObject({ email: 'viejo@gmail.com', googleSub: SUB });
+  });
+
+  it('ADMIN_EMAIL cambió y la identidad no tiene sub → también email_changed (no se revincula en silencio)', async () => {
+    const ctx = await buildTestApp();
+    await ctx.db.insert(adminIdentity).values({ email: 'viejo@gmail.com', googleSub: null });
+    const { res } = await login(ctx);
+    await expectRejected(ctx, res, 'email_changed');
+    const [identity] = await ctx.db.select().from(adminIdentity);
+    expect(identity.googleSub).toBeNull();
+  });
+
   it('segundo login con el mismo sub → aceptado', async () => {
     const ctx = await buildTestApp();
     await login(ctx);

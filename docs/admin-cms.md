@@ -74,6 +74,23 @@ Production). Marca como **Sensitive** las indicadas. Redespliega para que apliqu
 4. Un código de recuperación se marca como usado al consumirse. Si la creación de la
    sesión falla justo después, ese código queda quemado: usa otro.
 
+### Recuperar el acceso
+
+Si perdiste el acceso a tu cuenta de Google, o cambiaste `ADMIN_EMAIL`:
+
+1. En la pantalla de acceso del panel elige **Usar código de recuperación** e ingresa uno
+   de tus códigos. Abre una sesión de recuperación de 15 minutos, que solo permite
+   regenerar códigos o desvincular Google.
+2. Pulsa **Desvincular Google y volver a entrar** y confirma. El servidor borra la cuenta
+   de Google vinculada, fija el email al valor actual de `ADMIN_EMAIL`, registra
+   `identity_reset` en la auditoría y cierra la sesión de recuperación.
+3. Se abre el login con Google: la próxima cuenta con la que entres queda vinculada. Debe
+   ser exactamente `ADMIN_EMAIL` y tener el email verificado.
+4. Ya dentro, genera códigos de recuperación nuevos (el que usaste quedó consumido).
+
+Si cambias `ADMIN_EMAIL` en Vercel sin desvincular antes, el login se rechaza
+(`email_changed` en la auditoría): el panel nunca revincula en silencio.
+
 ## 6. Probar el panel en local
 
 ```bash

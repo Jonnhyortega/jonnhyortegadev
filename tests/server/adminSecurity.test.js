@@ -4,7 +4,7 @@ import { eq } from 'drizzle-orm';
 import { buildTestApp } from './helpers/app.js';
 import { loginAs } from './helpers/auth.js';
 import { recordAudit } from '../../server/services/audit.js';
-import { auditLog, sessions } from '../../server/db/schema.js';
+import { adminIdentity, auditLog, sessions } from '../../server/db/schema.js';
 
 const ORIGIN = 'https://example.test';
 const CODE = /^[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}$/;
@@ -105,5 +105,56 @@ describe('admin security: códigos de recuperación', () => {
       .set('Cookie', session.cookie)
       .set('Origin', ORIGIN);
     expect(res.status).toBe(403);
+  });
+});
+
+describe('admin security: desvincular Google (sesión recovery)', () => {
+  const URL = '/api/admin/security/identity/reset';
+  const ADMIN = 'jonnhyortega@gmail.com';
+
+  it('recovery: 204, borra el sub, fija el email de ADMIN_EMAIL, audita y cierra la sesión', async () => {
+    const { call, db } = await setup('recovery');
+    await db.insert(adminIdentity).values({ email: 'viejo@gmail.com', googleSub: 'sub-viejo' });
+
+    const res = await call('post', URL);
+    expect(res.status).toBe(204);
+    expect(res.headers['set-cookie'].join(';')).toMatch(/__Host-session=;.*Max-Age=0/);
+
+    const identities = await db.select().from(adminIdentity);
+    expect(identities).toHaveLength(1);
+    expect(identities[0]).toMatchObject({ email: ADMIN, googleSub: null });
+
+    const events = await db.select().from(auditLog).where(eq(auditLog.event, 'identity_reset'));
+    expect(events).toHaveLength(1);
+    expect(JSON.stringify(events[0])).not.toContain('sub-viejo');
+    expect(await db.select().from(sessions)).toHaveLength(0);
+    expect((await call('get', '/api/admin/me')).status).toBe(404);
+  });
+
+  it('sesión full: 404 genérico y la identidad no cambia', async () => {
+    const { call, db } = await setup('full');
+    await db.insert(adminIdentity).values({ email: ADMIN, googleSub: 'sub-actual' });
+    const res = await call('post', URL);
+    expect(res.status).toBe(404);
+    expect(res.body).toEqual({ error: 'not_found' });
+    const [identity] = await db.select().from(adminIdentity);
+    expect(identity.googleSub).toBe('sub-actual');
+  });
+
+  it('anónimo: 404 genérico', async () => {
+    const { app } = await setup();
+    const res = await request(app).post(URL).set('Origin', ORIGIN);
+    expect(res.status).toBe(404);
+    expect(res.body).toEqual({ error: 'not_found' });
+  });
+
+  it('recovery sin CSRF: 403 y la identidad no cambia', async () => {
+    const { app, db, session } = await setup('recovery');
+    await db.insert(adminIdentity).values({ email: ADMIN, googleSub: 'sub-actual' });
+    const res = await request(app).post(URL).set('Cookie', session.cookie).set('Origin', ORIGIN);
+    expect(res.status).toBe(403);
+    const [identity] = await db.select().from(adminIdentity);
+    expect(identity.googleSub).toBe('sub-actual');
+    expect(await db.select().from(sessions)).toHaveLength(1);
   });
 });

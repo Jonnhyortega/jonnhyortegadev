@@ -7,7 +7,11 @@ import { createTranslationsRouter } from './translations.js';
 import { createThemeRouter } from './theme.js';
 import { createProjectsRouter } from './projects.js';
 import { createRevisionsRouter } from './revisions.js';
-import { createSecurityRouter, createRecoveryCodesHandler } from './security.js';
+import {
+  createSecurityRouter,
+  createRecoveryCodesHandler,
+  createIdentityResetHandler,
+} from './security.js';
 import { SAFE_METHODS } from '../../middleware/jsonOnly.js';
 
 const MIN = 60_000;
@@ -39,9 +43,11 @@ export function createAdminRouter(deps) {
     res.json({ kind, csrfToken: csrfSecret, expiresAt });
   });
 
-  // RUTAS PERMITIDAS A RECOVERY: solo `POST /security/recovery-codes` (R18).
+  // RUTAS PERMITIDAS A RECOVERY: solo `POST /security/recovery-codes` (R18) y
+  // `POST /security/identity/reset`, que admite EXCLUSIVAMENTE recovery (R38).
   // Ninguna otra ruta va antes de la puerta.
   router.post('/security/recovery-codes', createRecoveryCodesHandler(deps));
+  router.post('/security/identity/reset', requireSession('recovery'), createIdentityResetHandler(deps));
 
   // Puerta full-only: falla cerrado para cualquier subrouter futuro.
   router.use(requireSession('full'));
