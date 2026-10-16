@@ -9,6 +9,9 @@ export function notFoundHandler(req, res, next) {
 // Solo se registra requestId y stack: nunca body ni headers.
 export function errorHandler(err, req, res, next) {
   if (res.headersSent) return next(err);
+  // Ninguna respuesta de error se cachea. Además, así el 404 genérico es idéntico
+  // (también en Cache-Control) al de /api/admin y /api/auth, que siempre son no-store.
+  res.set('Cache-Control', 'no-store');
 
   if (err instanceof InvalidInputError) {
     return res.status(400).json({ error: err.code, fields: err.fields });

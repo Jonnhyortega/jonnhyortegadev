@@ -13,10 +13,11 @@ import {
   createIdentityResetHandler,
 } from './security.js';
 import { SAFE_METHODS } from '../../middleware/jsonOnly.js';
+import { noStore } from '../../middleware/noStore.js';
 
 const MIN = 60_000;
 
-// Router de /api/admin. Orden: producción → sesión (full o recovery) → CSRF →
+// Router de /api/admin. Orden: no-store → producción → sesión (full o recovery) → CSRF →
 // límite de escrituras → rutas permitidas a recovery → puerta full-only →
 // resto. Todo lo que se monte después de la puerta exige sesión `full`.
 export function createAdminRouter(deps) {
@@ -32,6 +33,8 @@ export function createAdminRouter(deps) {
     keyFrom: (req) => req.session.id,
   });
 
+  // Nada de /api/admin se cachea (ni siquiera sus 404).
+  router.use(noStore);
   router.use(productionOnly(env));
   router.use(loadSession({ db, now }));
   router.use(requireSession('full', 'recovery'));

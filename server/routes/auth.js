@@ -4,6 +4,7 @@ import { asc, eq, sql } from 'drizzle-orm';
 import { adminIdentity } from '../db/schema.js';
 import { safeEqual, sha256 } from '../lib/crypto.js';
 import { productionOnly } from '../middleware/productionOnly.js';
+import { noStore } from '../middleware/noStore.js';
 import { rateLimit } from '../middleware/rateLimit.js';
 import { loadSession, requireSession } from '../middleware/session.js';
 import { requireCsrf, requireSameOrigin } from '../middleware/csrf.js';
@@ -79,11 +80,9 @@ export function createAuthRouter({ env, db, google, now }) {
     keyFrom: (req) => requestContext(req, env).ipHash,
   });
 
+  // Nada de /api/auth se cachea (ni siquiera sus 404).
+  router.use(noStore);
   router.use(productionOnly(env));
-  router.use((req, res, next) => {
-    res.set('Cache-Control', 'no-store');
-    next();
-  });
 
   router.get('/google/start', loginLimit, async (req, res) => {
     const flow = await createFlow(db, now());
