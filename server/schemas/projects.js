@@ -6,6 +6,7 @@ export const IMAGE_HOSTS = ['res.cloudinary.com', 'upload.wikimedia.org'];
 
 // Cualquier espacio, backslash o carácter de control se rechaza ANTES de
 // parsear: así el valor validado es el mismo que interpretará el navegador.
+// eslint-disable-next-line no-control-regex -- los caracteres de control son justamente lo que se rechaza
 const RAW_PROHIBIDO = /[\s\\\u0000-\u001F\u007F]/;
 
 function parseHttps(value) {

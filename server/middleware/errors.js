@@ -7,7 +7,6 @@ export function notFoundHandler(req, res, next) {
 
 // Mapea errores conocidos a {error: code}; cualquier otro es un 500 genérico.
 // Solo se registra requestId y stack: nunca body ni headers.
-// eslint-disable-next-line no-unused-vars
 export function errorHandler(err, req, res, next) {
   if (res.headersSent) return next(err);
 

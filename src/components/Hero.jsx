@@ -119,7 +119,7 @@ const Hero = () => {
               </MagneticButton>
 
               <MagneticButton
-                onClick={e => {
+                onClick={() => {
                   window.open('https://api.whatsapp.com/send?phone=5491122684234&text=Hola%20quiero%20más%20info', '_blank');
                 }}
                 className="group flex cursor-pointer items-center gap-3 rounded-full bg-yellow-400 px-8 py-4 font-semibold text-ink shadow-[0_0_40px_-10px_rgba(250,204,21,0.9)] transition-colors hover:bg-yellow-300"

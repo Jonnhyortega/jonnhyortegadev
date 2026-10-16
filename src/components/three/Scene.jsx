@@ -231,7 +231,7 @@ export default function Scene() {
   const [ready, setReady] = useState(false);
   const mobile = useMemo(() => window.matchMedia('(max-width: 767px)').matches, []);
   const reduced = useMemo(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches, []);
-  const supported = useMemo(webglSupported, []);
+  const supported = useMemo(() => webglSupported(), []);
   const colors = useSceneColors();
 
   if (!supported) return null;

@@ -3,6 +3,7 @@ export const IMAGE_HOSTS = ['res.cloudinary.com', 'upload.wikimedia.org']
 
 // Misma regla que el servidor (que es la autoridad): https, host permitido, sin credenciales.
 export function isAllowedImageUrl(value) {
+  // eslint-disable-next-line no-control-regex -- los caracteres de control son justamente lo que se rechaza
   if (typeof value !== 'string' || /[\s\\\u0000-\u001F\u007F]/.test(value)) return false
   try {
     const url = new URL(value)

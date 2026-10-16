@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { DEFAULT_TRANSLATIONS } from '../../src/content/defaults.js';
 
 // Rechaza caracteres de control (salvo tab, salto de línea y retorno).
+// eslint-disable-next-line no-control-regex -- los caracteres de control son justamente lo que se rechaza
 const SIN_CONTROL = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/;
 
 export const sinControl = (value) => !SIN_CONTROL.test(value);
