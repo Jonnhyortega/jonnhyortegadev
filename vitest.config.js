@@ -17,6 +17,7 @@ export default defineConfig({
     globalSetup: ['tests/server/helpers/globalSetup.js'],
     setupFiles: ['tests/server/helpers/setup.js'],
     pool: 'forks',
-    maxWorkers: 2,
+    // En CI (poca memoria) un solo worker evita "Worker exited unexpectedly".
+    maxWorkers: process.env.CI ? 1 : 2,
   },
 });
