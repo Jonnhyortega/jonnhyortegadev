@@ -9,6 +9,7 @@ import Footer from '@/components/Footer';
 import SideHud from '@/components/SideHud';
 import ScrollMarquee from '@/components/fx/ScrollMarquee';
 import LanguageProvider, { useLanguage } from '@/context/LanguageContext';
+import ContentProvider from '@/context/ContentContext';
 import Chatbot from './components/Chatbot';
 
 // Three.js se carga aparte para no bloquear el primer render
@@ -95,9 +96,11 @@ function App() {
 // El idioma vive en el contexto, por eso el Provider envuelve a la app interna.
 function Root() {
   return (
-    <LanguageProvider>
-      <App />
-    </LanguageProvider>
+    <ContentProvider>
+      <LanguageProvider>
+        <App />
+      </LanguageProvider>
+    </ContentProvider>
   );
 }
 

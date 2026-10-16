@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState } from 'react';
-import { DEFAULT_TRANSLATIONS } from '@/content/defaults';
+import { useContent } from '@/context/ContentContext';
 
 const LanguageContext = createContext();
 
@@ -12,11 +12,12 @@ export const useLanguage = () => {
 };
 
 const LanguageProvider = ({ children }) => {
+  const { translations } = useContent();
   const [language, setLanguage] = useState('es');
 
   const t = (key) => {
     const keys = key.split('.');
-    let value = DEFAULT_TRANSLATIONS[language];
+    let value = translations[language];
     for (const k of keys) {
       value = value?.[k];
     }

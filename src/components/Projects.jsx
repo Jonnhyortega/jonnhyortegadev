@@ -2,7 +2,7 @@ import React, { useRef } from 'react';
 import { motion, useScroll, useTransform, useMotionValue } from 'framer-motion';
 import { ExternalLink, Github } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
-import { DEFAULT_PROJECTS } from '@/content/defaults';
+import { useContent } from '@/context/ContentContext';
 import TiltCard from '@/components/fx/TiltCard';
 import SectionHeading from '@/components/fx/SectionHeading';
 import useMediaQuery from '@/hooks/useMediaQuery';
@@ -67,7 +67,9 @@ const TechIcon = ({ type }) => {
 const Projects = () => {
   const { t, language } = useLanguage();
 
-  const projects = DEFAULT_PROJECTS.map((project) => ({
+  const { projects: sourceProjects } = useContent();
+
+  const projects = sourceProjects.map((project) => ({
     ...project,
     description: language === 'en' ? project.descriptionEn : project.descriptionEs,
     image: project.imageUrl,
