@@ -6,6 +6,24 @@ export const config = { matcher: ['/((?!assets/|api/).*)'] };
 
 const PANEL_RETURN_COOKIE = '__Host-panel-return';
 
+// Formato admitido de ADMIN_PATH: "/" y 8 o más caracteres [A-Za-z0-9_-], sin chocar con
+// /api ni /assets. Un valor fuera de formato se ignora por completo (falla cerrado).
+function isValidAdminPath(path) {
+  return (
+    typeof path === 'string' && /^\/[A-Za-z0-9_-]{8,}$/.test(path) && !/^\/(api|assets)/i.test(path)
+  );
+}
+
+// Host canónico (el de APP_ORIGIN), o null si no está definido o no es una URL.
+function canonicalHost(appOrigin) {
+  if (!appOrigin) return null;
+  try {
+    return new URL(appOrigin).host;
+  } catch {
+    return null;
+  }
+}
+
 // Normaliza para comparar con admin.html: decodifica, colapsa "/", minúsculas y sin "/" final.
 // Devuelve null si la codificación es inválida.
 function normalizePath(pathname) {
@@ -34,11 +52,22 @@ export async function handle(request, env) {
     return new Response('Not Found', { status: 404 });
   }
 
-  // Fuera de producción o sin ruta configurada, la ruta secreta no existe.
-  if (env.VERCEL_ENV !== 'production' || !env.ADMIN_PATH) return undefined;
+  // Fuera de producción, sin ruta configurada o con una ruta mal formada, la ruta secreta
+  // no existe.
+  if (env.VERCEL_ENV !== 'production' || !isValidAdminPath(env.ADMIN_PATH)) return undefined;
 
   // La ruta secreta se compara tal cual, sin normalizar.
   if (url.pathname === env.ADMIN_PATH) {
+    // Fuera del host canónico (p. ej. el apex sin www) se redirige a APP_ORIGIN: las
+    // cookies __Host- y la comprobación de Origin solo valen en ese host.
+    const host = canonicalHost(env.APP_ORIGIN);
+    if (host && url.host !== host) {
+      const target = new URL(`${url.pathname}${url.search}`, env.APP_ORIGIN);
+      return new Response(null, {
+        status: 308,
+        headers: { Location: target.toString(), 'Cache-Control': 'no-store' },
+      });
+    }
     return rewrite(new URL('/admin.html', request.url), {
       headers: {
         'X-Robots-Tag': 'noindex, nofollow',

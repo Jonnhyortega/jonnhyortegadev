@@ -20,7 +20,7 @@ El diseño completo está en `docs/superpowers/specs/2026-10-16-admin-cms-design
 | `APP_ORIGIN` | Vercel | `https://www.jonnhyortegadev.com` |
 | `IP_HASH_SECRET` | Vercel (Sensitive) | 32 bytes aleatorios. |
 | `PANEL_RETURN_SECRET` | Vercel (Sensitive) | 32 bytes aleatorios; firma la cookie de retorno del login. |
-| `ADMIN_PATH` | Vercel (Sensitive) | Tu ruta secreta del panel, por ejemplo `/algo-largo-y-aleatorio`. |
+| `ADMIN_PATH` | Vercel (Sensitive) | Tu ruta secreta del panel, por ejemplo `/algo-largo-y-aleatorio`. Ver formato abajo. |
 | `VITE_API_URL` | Vercel | Ya existía (chatbot). |
 
 Generar un secreto aleatorio (para `IP_HASH_SECRET`, `PANEL_RETURN_SECRET` y una ruta
@@ -32,7 +32,20 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
 
 Usa un valor distinto para cada variable. Para `ADMIN_PATH`, antepone `/`.
 
-## 2. Google OAuth
+**Formato de `ADMIN_PATH`:** debe cumplir `^/[A-Za-z0-9_-]{8,}$` (una `/` y al menos 8
+letras, dígitos, `_` o `-`; sin más barras, puntos ni espacios) y no puede empezar por
+`/api` ni `/assets`. Si no lo cumple, la middleware lo ignora por completo y el panel no
+existe (falla cerrado). Una ruta corta como `/mi-panel` (9 caracteres) se acepta, pero
+se recomienda una larga y aleatoria como la que genera el comando anterior
+(`base64url` solo usa caracteres válidos; si por azar empieza por `api` o `assets`, genera otra).
+
+**Un solo host:** `APP_ORIGIN`, `OAUTH_REDIRECT_URI` y los orígenes y URI de redirección de
+Google Cloud Console deben usar exactamente el mismo host (`www.jonnhyortegadev.com`). Las
+cookies `__Host-` y la comprobación de `Origin` solo funcionan en ese host. Si alguien
+abre la ruta del panel en otro host, la middleware responde un 308 al mismo path en
+`APP_ORIGIN`.
+
+## 2. Google OAuth y dominio
 
 1. En [Google Cloud Console](https://console.cloud.google.com/) crea (o elige) un proyecto.
 2. Configura la pantalla de consentimiento (tipo externo, solo tu cuenta como usuario de prueba o publicada).
@@ -40,6 +53,13 @@ Usa un valor distinto para cada variable. Para `ADMIN_PATH`, antepone `/`.
 4. Orígenes de JavaScript autorizados: `https://www.jonnhyortegadev.com`
 5. URI de redirección autorizados: `https://www.jonnhyortegadev.com/api/auth/google/callback`
 6. Copia el ID y el secreto a `GOOGLE_CLIENT_ID` y `GOOGLE_CLIENT_SECRET` en Vercel.
+
+### Dominio canónico
+
+En Vercel, Project Settings, Domains: configura el dominio apex (`jonnhyortegadev.com`)
+para que **redirija** a `www.jonnhyortegadev.com` (no lo sirvas como un segundo host).
+Así todo el tráfico llega al host de `APP_ORIGIN`, el mismo que usan `OAUTH_REDIRECT_URI`
+y la consola de Google.
 
 ## 3. Base de datos (Neon)
 

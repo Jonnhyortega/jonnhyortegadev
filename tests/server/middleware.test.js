@@ -125,6 +125,53 @@ describe('middleware del panel', () => {
     expect(await handle(req('/otra-ruta'), PROD)).toBeUndefined();
   });
 
+  it.each([
+    'test-panel-path',
+    '/corto',
+    '/1234567',
+    '/con espacio-largo',
+    '/con/barra-larga',
+    '/ruta.con.puntos',
+    '/api-panel-secreto',
+    '/apisecreta1234',
+    '/assets-panel-secreto',
+    '/ASSETSpanel1234',
+    '/admin.html',
+    '/',
+    '',
+  ])('ignora un ADMIN_PATH con formato inválido (falla cerrado): %s', async (adminPath) => {
+    const env = { ...PROD, ADMIN_PATH: adminPath };
+    if (adminPath.startsWith('/') && !adminPath.endsWith('admin.html')) {
+      expect(await handle(req(adminPath.replace(/ /g, '%20')), env)).toBeUndefined();
+    }
+    expect(await handle(req('/__panel-return', { cookie: await signed() }), env)).toBeUndefined();
+  });
+
+  it('acepta un ADMIN_PATH corto pero válido (8+ caracteres)', async () => {
+    const env = { ...PROD, ADMIN_PATH: '/mi-panel' };
+    const res = await handle(req('/mi-panel'), env);
+    expect(res.headers.get('x-middleware-rewrite')).toMatch(/\/admin\.html$/);
+  });
+
+  it('en otro host que APP_ORIGIN, la ruta secreta redirige con 308 al mismo path en APP_ORIGIN', async () => {
+    const env = { ...PROD, APP_ORIGIN: 'https://www.example.com' };
+    const res = await handle(req('/test-panel-path'), env);
+    expect(res.status).toBe(308);
+    expect(res.headers.get('location')).toBe('https://www.example.com/test-panel-path');
+    expect(res.headers.get('x-middleware-rewrite')).toBeNull();
+  });
+
+  it('en el host de APP_ORIGIN la ruta secreta se reescribe normalmente', async () => {
+    const env = { ...PROD, APP_ORIGIN: 'https://example.com' };
+    const res = await handle(req('/test-panel-path'), env);
+    expect(res.headers.get('x-middleware-rewrite')).toMatch(/\/admin\.html$/);
+  });
+
+  it('sin APP_ORIGIN no redirige de host', async () => {
+    const res = await handle(req('/test-panel-path'), { ...PROD, APP_ORIGIN: undefined });
+    expect(res.headers.get('x-middleware-rewrite')).toMatch(/\/admin\.html$/);
+  });
+
   it('excluye assets y api del matcher', async () => {
     expect(config.matcher).toEqual(['/((?!assets/|api/).*)']);
   });
