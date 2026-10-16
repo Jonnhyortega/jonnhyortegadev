@@ -48,7 +48,8 @@ export async function handle(request, env) {
   }
 
   // Destino neutro del callback de OAuth. Solo revela la ruta del panel a quien trae la
-  // cookie firmada que fija el callback; sin ella la ruta no existe.
+  // cookie firmada que el callback fija únicamente tras un login correcto (R37); sin ella
+  // la ruta no existe.
   if (
     url.pathname === '/__panel-return' &&
     (await verifyPanelReturn(
@@ -58,7 +59,6 @@ export async function handle(request, env) {
     ))
   ) {
     const target = new URL(env.ADMIN_PATH, request.url);
-    if (url.searchParams.get('error') === '1') target.searchParams.set('error', '1');
     return new Response(null, {
       status: 302,
       headers: {

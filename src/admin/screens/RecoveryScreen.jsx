@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { api, ApiError } from '../api.js'
+import { GOOGLE_START, markLoginPending } from '../lib/loginPending.js'
 
 export default function RecoveryScreen({ csrf }) {
   const [codes, setCodes] = useState(null)
@@ -62,7 +63,8 @@ export default function RecoveryScreen({ csrf }) {
               {copied ? 'Copiado' : 'Copiar'}
             </button>
             <a
-              href="/api/auth/google/start"
+              href={GOOGLE_START}
+              onClick={() => markLoginPending()}
               className="block w-full rounded-lg bg-purple-600 px-4 py-2 text-center font-medium hover:bg-purple-500"
             >
               Volver a entrar con Google
@@ -70,7 +72,8 @@ export default function RecoveryScreen({ csrf }) {
           </>
         ) : expired ? (
           <a
-            href="/api/auth/google/start"
+            href={GOOGLE_START}
+            onClick={() => markLoginPending()}
             className="block w-full rounded-lg bg-purple-600 px-4 py-2 text-center font-medium hover:bg-purple-500"
           >
             Volver a entrar con Google

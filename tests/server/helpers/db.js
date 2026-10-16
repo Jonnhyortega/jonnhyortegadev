@@ -44,6 +44,27 @@ export function resetTestDbPool() {
   requestedInTest = 0;
 }
 
+// Huella del esquema (tablas y restricciones de public). Algunos tests rompen el
+// esquema a propósito (drop table, constraints extra) para simular fallos de BD:
+// una instancia con otra huella no se recicla, se reemplaza por una copia limpia.
+async function schemaFingerprint(client) {
+  const { rows } = await client.query(
+    `SELECT (SELECT count(*) FROM pg_tables WHERE schemaname = 'public')::int AS tables,
+            (SELECT count(*) FROM pg_constraint c JOIN pg_namespace n ON n.oid = c.connamespace
+              WHERE n.nspname = 'public')::int AS constraints`,
+  );
+  return `${rows[0].tables}/${rows[0].constraints}`;
+}
+let cleanFingerprint;
+
+async function freshClient() {
+  const template = await getTemplate();
+  const client = new PGlite({ loadDataDir: template });
+  await client.waitReady;
+  cleanFingerprint ??= await schemaFingerprint(client);
+  return client;
+}
+
 async function resetTables(client) {
   // Defensa: suelta bloqueos y transacciones que un test anterior haya dejado abiertos.
   await client.query('SELECT pg_advisory_unlock_all()');
@@ -66,13 +87,17 @@ export async function createTestDb() {
   requestedInTest += 1;
   let client;
   if (pool.length < MAX_LIVE) {
-    const template = await getTemplate();
-    client = new PGlite({ loadDataDir: template });
-    await client.waitReady;
+    client = await freshClient();
     pool.push(client);
   } else {
-    client = pool[next++ % MAX_LIVE];
+    const slot = next++ % MAX_LIVE;
+    client = pool[slot];
     await resetTables(client);
+    if ((await schemaFingerprint(client)) !== cleanFingerprint) {
+      await client.close().catch(() => {});
+      client = await freshClient();
+      pool[slot] = client;
+    }
   }
   return drizzle(client, { schema });
 }

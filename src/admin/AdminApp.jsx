@@ -4,17 +4,28 @@ import LoginScreen from './screens/LoginScreen.jsx'
 import RecoveryScreen from './screens/RecoveryScreen.jsx'
 import DevNotice from './screens/DevNotice.jsx'
 import Dashboard from './Dashboard.jsx'
+import { takeLoginPending } from './lib/loginPending.js'
 
 export default function AdminApp() {
   // state: 'loading' | 'anonymous' | { kind, csrfToken, expiresAt }
   const [state, setState] = useState('loading')
+  // Se volvió de Google sin sesión: el login falló (el servidor no lo indica, R37).
+  const [loginFailed, setLoginFailed] = useState(false)
 
   const loadSession = useCallback(async () => {
     try {
-      setState(await api('/api/admin/me'))
+      const session = await api('/api/admin/me')
+      takeLoginPending()
+      setLoginFailed(false)
+      setState(session)
     } catch (err) {
       // Sin sesión la API responde un 404 genérico; cualquier otro fallo es un error de conexión.
-      setState(err instanceof ApiError && err.status === 404 ? 'anonymous' : 'error')
+      if (err instanceof ApiError && err.status === 404) {
+        setLoginFailed(takeLoginPending())
+        setState('anonymous')
+      } else {
+        setState('error')
+      }
     }
   }, [])
 
@@ -45,7 +56,7 @@ export default function AdminApp() {
     )
   }
   if (state === 'anonymous') {
-    return import.meta.env.DEV ? <DevNotice /> : <LoginScreen onSession={loadSession} />
+    return import.meta.env.DEV ? <DevNotice /> : <LoginScreen onSession={loadSession} loginFailed={loginFailed} />
   }
   if (state.kind === 'recovery') {
     return <RecoveryScreen csrf={state.csrfToken} />

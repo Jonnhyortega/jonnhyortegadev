@@ -41,11 +41,11 @@ describe('middleware del panel', () => {
     expect(new URL(res.headers.get('location')).pathname).toBe('/test-panel-path');
   });
 
-  it('conserva solo error=1 al redirigir', async () => {
+  it('no propaga parámetros al redirigir (la cookie solo existe tras un login correcto)', async () => {
     const res = await handle(req('/__panel-return?error=1&x=2', { cookie: await signed() }), PROD);
     expect(res.status).toBe(302);
     const loc = new URL(res.headers.get('location'));
-    expect(loc.pathname + loc.search).toBe('/test-panel-path?error=1');
+    expect(loc.pathname + loc.search).toBe('/test-panel-path');
   });
 
   it('borra la cookie de retorno al redirigir', async () => {

@@ -87,12 +87,18 @@ async function expectPanelReturnCookie(res, ctx) {
   expect(await verifyPanelReturn('otro-secreto-otro-secreto-otro-secreto-12', value, ctx.clock.now().getTime())).toBe(false);
 }
 
+// Un rechazo nunca emite la cookie de retorno al panel: sin ella,
+// /__panel-return no revela la ruta secreta (R37).
+function expectNoPanelReturnCookie(res) {
+  expect(findCookie(res, '__Host-panel-return')).toBeUndefined();
+}
+
 async function expectRejected(ctx, res, reason) {
   expect(res.status).toBe(302);
-  expect(res.headers.location).toBe('/__panel-return?error=1');
+  expect(res.headers.location).toBe('/');
   expect(sessionCookie(res)).toBeUndefined();
   expectOauthCookieCleared(res);
-  await expectPanelReturnCookie(res, ctx);
+  expectNoPanelReturnCookie(res);
   // Todos los eventos del test comparten la hora del reloj falso: se compara
   // el conjunto de motivos de rechazo, no el orden.
   const reasons = (await auditEvents(ctx))
@@ -389,7 +395,7 @@ describe('GET /api/auth/google/callback', () => {
     expect(logged).not.toContain(bindingCookie.slice(`${OAUTH_COOKIE}=`.length));
   });
 
-  it('si además falla el audit de internal_error → igual redirige con error', async () => {
+  it('si además falla el audit de internal_error → igual redirige a / sin cookie de retorno', async () => {
     const ctx = await buildTestApp();
     const { state, bindingCookie } = await startFlow(ctx);
     await ctx.db.execute(sql`drop table oauth_flows`);
@@ -397,10 +403,16 @@ describe('GET /api/auth/google/callback', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     const res = await callback(ctx, { code: 'auth-code', state }, [bindingCookie]);
     expect(res.status).toBe(302);
-    expect(res.headers.location).toBe('/__panel-return?error=1');
-    await expectPanelReturnCookie(res, ctx);
+    expect(res.headers.location).toBe('/');
+    expectNoPanelReturnCookie(res);
     expect(sessionCookie(res)).toBeUndefined();
     expectOauthCookieCleared(res);
+  });
+
+  it('un callback anónimo sin parámetros no emite la cookie de retorno (no revela la ruta)', async () => {
+    const ctx = await buildTestApp();
+    const res = await request(ctx.app).get('/api/auth/google/callback');
+    await expectRejected(ctx, res, 'invalid_state');
   });
 });
 

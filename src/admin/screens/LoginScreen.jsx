@@ -1,19 +1,16 @@
 import { useState } from 'react'
 import { api, ApiError } from '../api.js'
+import { GOOGLE_START, markLoginPending } from '../lib/loginPending.js'
 
 const MESSAGES = {
   invalid_code: 'Código inválido.',
   rate_limited: 'Demasiados intentos. Probá más tarde.',
 }
 
-export default function LoginScreen({ onSession }) {
+export default function LoginScreen({ onSession, loginFailed = false }) {
   const [showCode, setShowCode] = useState(false)
   const [code, setCode] = useState('')
-  const [message, setMessage] = useState(
-    new URLSearchParams(window.location.search).get('error') === '1'
-      ? 'No se pudo iniciar sesión.'
-      : '',
-  )
+  const [message, setMessage] = useState(loginFailed ? 'No se pudo iniciar sesión.' : '')
   const [busy, setBusy] = useState(false)
 
   const submitCode = async (event) => {
@@ -42,7 +39,8 @@ export default function LoginScreen({ onSession }) {
         )}
 
         <a
-          href="/api/auth/google/start"
+          href={GOOGLE_START}
+          onClick={() => markLoginPending()}
           className="block w-full rounded-lg bg-purple-600 px-4 py-2 text-center font-medium hover:bg-purple-500"
         >
           Entrar con Google

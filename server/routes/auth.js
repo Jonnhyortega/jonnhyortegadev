@@ -35,14 +35,17 @@ const RECOVERY_LOCK_KEY = 'recovery:global';
 // La middleware (Task 15) convierte esta ruta en un 302 hacia el panel.
 const PANEL_RETURN = '/__panel-return';
 // Cookie firmada y de vida corta (R29/R31): la middleware solo revela la ruta a quien
-// viene de un callback (R29). Sin ella, /__panel-return no existe.
+// la trae. Se emite SOLO tras un login correcto (R37): cualquier rechazo va a `/`.
 const PANEL_RETURN_COOKIE = '__Host-panel-return';
+// Destino neutro de todo rechazo: no revela nada del panel.
+const REJECTED_REDIRECT = '/';
 
 // Router de /api/auth: login con Google (OAuth + PKCE), recuperación y logout.
 export function createAuthRouter({ env, db, google, now }) {
   const router = Router();
 
   // El valor va firmado (HMAC): la middleware solo acepta cookies que emitió este callback.
+  // Solo se usa en el camino de login correcto.
   async function redirectToPanel(res, location) {
     const expiresAtMs = now().getTime() + PANEL_RETURN_TTL_MS;
     res.append(
@@ -154,7 +157,6 @@ export function createAuthRouter({ env, db, google, now }) {
 
   router.get('/google/callback', loginLimit, async (req, res) => {
     const context = requestContext(req, env);
-    const failRedirect = `${PANEL_RETURN}?error=1`;
     // La cookie de binding se borra siempre, con éxito o con error.
     clearFlowCookie(res);
 
@@ -168,7 +170,7 @@ export function createAuthRouter({ env, db, google, now }) {
           meta: { reason: result.reason },
           now: now(),
         });
-        return await redirectToPanel(res, failRedirect);
+        return res.redirect(302, REJECTED_REDIRECT);
       }
       setSessionCookie(res, result.token, result.maxAgeMs);
       return await redirectToPanel(res, PANEL_RETURN);
@@ -186,10 +188,10 @@ export function createAuthRouter({ env, db, google, now }) {
         // auditoría de mejor esfuerzo
       }
       if (res.headersSent) return;
-      // Por si acaso: ninguna cookie de sesión sale en una respuesta de error.
+      // Por si acaso: ninguna cookie de sesión ni de retorno sale en una respuesta de error.
       res.removeHeader('Set-Cookie');
       clearFlowCookie(res);
-      await redirectToPanel(res, failRedirect);
+      res.redirect(302, REJECTED_REDIRECT);
     }
   });
 
