@@ -57,7 +57,7 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
-    "@babel/generator": "^7.27.0",
+    "@babel/generator": "^8.0.6",
     "@babel/parser": "^7.27.0",
     "@babel/traverse": "^7.27.0",
     "@babel/types": "^7.27.0",
